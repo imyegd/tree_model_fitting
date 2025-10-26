@@ -90,52 +90,22 @@ def load_and_prepare_data(csv_file_path, n_samples=None):
     
     return X, y, feature_columns
 
-def split_data(X, y, test_size=0.2, random_state=42):
-    """
-    划分训练集和测试集
-    
-    Args:
-        X (numpy.ndarray): 特征矩阵
-        y (numpy.ndarray): 目标变量
-        test_size (float): 测试集比例
-        random_state (int): 随机种子
-    
-    Returns:
-        tuple: (X_train, X_test, y_train, y_test)
-    """
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=test_size, random_state=random_state
-    )
-    
-    print(f"训练集大小: {X_train.shape[0]} 样本")
-    print(f"测试集大小: {X_test.shape[0]} 样本")
-    print(f"训练集特征维度: {X_train.shape[1]}")
-    print(f"测试集特征维度: {X_test.shape[1]}")
-    
-    return X_train, X_test, y_train, y_test
-
-# def split_data(X, y, test_size=0.2, random_state=None):
+# def split_data(X, y, test_size=0.2, random_state=42):
 #     """
-#     划分训练集和测试集（按顺序划分，不使用随机）
+#     划分训练集和测试集
     
 #     Args:
 #         X (numpy.ndarray): 特征矩阵
 #         y (numpy.ndarray): 目标变量
 #         test_size (float): 测试集比例
-#         random_state: 该参数已废弃，保留仅为兼容性
+#         random_state (int): 随机种子
     
 #     Returns:
 #         tuple: (X_train, X_test, y_train, y_test)
 #     """
-#     # 计算分割点
-#     n_samples = X.shape[0]
-#     split_idx = int(n_samples * (1 - test_size))
-    
-#     # 按顺序划分：前80%为训练集，后20%为测试集
-#     X_train = X[:split_idx]
-#     X_test = X[split_idx:]
-#     y_train = y[:split_idx]
-#     y_test = y[split_idx:]
+#     X_train, X_test, y_train, y_test = train_test_split(
+#         X, y, test_size=test_size, random_state=random_state
+#     )
     
 #     print(f"训练集大小: {X_train.shape[0]} 样本")
 #     print(f"测试集大小: {X_test.shape[0]} 样本")
@@ -143,6 +113,36 @@ def split_data(X, y, test_size=0.2, random_state=42):
 #     print(f"测试集特征维度: {X_test.shape[1]}")
     
 #     return X_train, X_test, y_train, y_test
+
+def split_data(X, y, test_size=0.2, random_state=None):
+    """
+    划分训练集和测试集（按顺序划分，不使用随机）
+    
+    Args:
+        X (numpy.ndarray): 特征矩阵
+        y (numpy.ndarray): 目标变量
+        test_size (float): 测试集比例
+        random_state: 该参数已废弃，保留仅为兼容性
+    
+    Returns:
+        tuple: (X_train, X_test, y_train, y_test)
+    """
+    # 计算分割点
+    n_samples = X.shape[0]
+    split_idx = int(n_samples * (1 - test_size))
+    
+    # 按顺序划分：前80%为训练集，后20%为测试集
+    X_train = X[:split_idx]
+    X_test = X[split_idx:]
+    y_train = y[:split_idx]
+    y_test = y[split_idx:]
+    
+    print(f"训练集大小: {X_train.shape[0]} 样本")
+    print(f"测试集大小: {X_test.shape[0]} 样本")
+    print(f"训练集特征维度: {X_train.shape[1]}")
+    print(f"测试集特征维度: {X_test.shape[1]}")
+    
+    return X_train, X_test, y_train, y_test
 
 def train_decision_tree(X_train, y_train, max_depth=None, min_samples_split=2, min_samples_leaf=1):
     """
@@ -274,29 +274,50 @@ def hyperparameter_tuning(model_type, X_train, y_train, cv=5):
     print(f"开始对{model_type}进行超参数调优...")
     
     if model_type == 'decision_tree':
+        # param_grid = {
+        #     'max_depth': [None, 10, 20, 30],
+        #     'min_samples_split': [2, 5, 10],
+        #     'min_samples_leaf': [1, 2, 4]
+        # }
         param_grid = {
-            'max_depth': [None, 10, 20, 30],
-            'min_samples_split': [2, 5, 10],
-            'min_samples_leaf': [1, 2, 4]
-        }
+        'max_depth': [5, 8, 10, 12],  # 限制最大深度
+        'min_samples_split': [10, 20, 50],  # 增加分裂所需的最小样本数
+        'min_samples_leaf': [5, 10, 20]  # 增加叶子节点的最小样本数
+    }
         base_model = DecisionTreeRegressor(random_state=42)
         
     elif model_type == 'random_forest':
+        # param_grid = {
+        #     'n_estimators': [50, 100, 200],
+        #     'max_depth': [None, 10, 20],
+        #     'min_samples_split': [2, 5],
+        #     'min_samples_leaf': [1, 2]
+        # }
         param_grid = {
-            'n_estimators': [50, 100, 200],
-            'max_depth': [None, 10, 20],
-            'min_samples_split': [2, 5],
-            'min_samples_leaf': [1, 2]
-        }
+        'n_estimators': [50, 100, 200],
+        'max_depth': [10, 20],  # 限制深度
+        'min_samples_split': [5, 10],  # 增加分裂所需的最小样本
+        'min_samples_leaf': [2, 5],  # 增加叶子节点的最小样本
+        'max_features': ['sqrt', 'log2', 0.5]  # 这个有效！
+    }
         base_model = RandomForestRegressor(random_state=42, n_jobs=-1)
         
     elif model_type == 'xgboost' and XGBOOST_AVAILABLE:
+        # param_grid = {
+        #     'n_estimators': [50, 100, 200],
+        #     'max_depth': [3, 6, 9],
+        #     'learning_rate': [0.01, 0.1, 0.2],
+        #     'subsample': [0.8, 0.9, 1.0]
+        # }
         param_grid = {
-            'n_estimators': [50, 100, 200],
-            'max_depth': [3, 6, 9],
-            'learning_rate': [0.01, 0.1, 0.2],
-            'subsample': [0.8, 0.9, 1.0]
-        }
+        'n_estimators': [50, 100],  # 2个值
+        'max_depth': [3, 4],  # 2个值
+        'learning_rate': [0.01, 0.05],  # 2个值
+        'colsample_bytree': [0.8],  # 固定为1个值
+        'min_child_weight': [3],  # 固定为1个值
+        'reg_alpha': [0],  # 固定为1个值
+        'reg_lambda': [1, 2]  # 2个值
+    }
         base_model = xgb.XGBRegressor(random_state=42, n_jobs=-1)
         
     else:
