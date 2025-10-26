@@ -1,7 +1,7 @@
 {
   "model_info": {
     "model_type": "decision_tree",
-    "timestamp": "20251023_173813",
+    "timestamp": "20251026_162719",
     "feature_count": 35,
     "feature_importance": {
       "feature1": 3.0881517440116774e-06,

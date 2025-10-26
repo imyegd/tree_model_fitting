@@ -1,7 +1,7 @@
 {
   "model_info": {
     "model_type": "xgboost",
-    "timestamp": "20251023_174452",
+    "timestamp": "20251026_163606",
     "feature_count": 35,
     "feature_importance": {
       "feature1": 0.00013455092266667634,
