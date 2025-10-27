@@ -308,16 +308,16 @@ def hyperparameter_tuning(model_type, X_train, y_train, cv=5):
     print(f"开始对{model_type}进行超参数调优...")
     
     if model_type == 'decision_tree':
-        # param_grid = {
-        #     'max_depth': [None, 10, 20, 30],
-        #     'min_samples_split': [2, 5, 10],
-        #     'min_samples_leaf': [1, 2, 4]
-        # }
         param_grid = {
-            'max_depth': [3, 5, 8],
+            'max_depth': [3, 5, 10, 20, 30],
             'min_samples_split': [2, 5, 10],
             'min_samples_leaf': [1, 2, 4]
         }
+        # param_grid = {
+        #     'max_depth': [3, 5, 8],
+        #     'min_samples_split': [2, 5, 10],
+        #     'min_samples_leaf': [1, 2, 4]
+        # }
         base_model = DecisionTreeRegressor(random_state=42)
         
     elif model_type == 'random_forest':
@@ -328,11 +328,11 @@ def hyperparameter_tuning(model_type, X_train, y_train, cv=5):
         #     'min_samples_leaf': [1, 2]
         # }
         param_grid = {
-        'n_estimators': [50, 100, 200],
-        'max_depth': [10, 20],  # 限制深度
+        'n_estimators': [10, 50, 100],
+        'max_depth': [5, 10, 20],  # 限制深度
         'min_samples_split': [5, 10],  # 增加分裂所需的最小样本
         'min_samples_leaf': [2, 5],  # 增加叶子节点的最小样本
-        'max_features': ['sqrt', 'log2', 0.5]  # 这个有效！
+        'max_features': ['sqrt', 'log2', 0.5]  
     }
         base_model = RandomForestRegressor(random_state=42, n_jobs=-1)
         
@@ -344,13 +344,13 @@ def hyperparameter_tuning(model_type, X_train, y_train, cv=5):
         #     'subsample': [0.8, 0.9, 1.0]
         # }
         param_grid = {
-        'n_estimators': [50, 100],  # 2个值
-        'max_depth': [3, 4],  # 2个值
-        'learning_rate': [0.01, 0.05],  # 2个值
-        'colsample_bytree': [0.8],  # 固定为1个值
-        'min_child_weight': [3],  # 固定为1个值
-        'reg_alpha': [0],  # 固定为1个值
-        'reg_lambda': [1, 2]  # 2个值
+        'n_estimators': [50, 100],  
+        'max_depth': [3, 6, 9], 
+        'learning_rate': [0.01, 0.05],  
+        'colsample_bytree': [0.8],  
+        'min_child_weight': [3],  
+        'reg_alpha': [0],  
+        'reg_lambda': [1, 2]  
     }
         base_model = xgb.XGBRegressor(random_state=42, n_jobs=-1)
         
@@ -823,19 +823,49 @@ def main():
     
     # CSV文件路径
     csv_file = "./data/束流.csv"
+    split_data_file = "./data/split_data.npz"
     
     try:
         # 加载和准备数据（使用所有数据）
         X, y, feature_columns = load_and_prepare_data(csv_file, n_samples=None)
         
         # 划分训练集和测试集
-        X_train, X_test, y_train, y_test = split_data(X, y, test_size=0.2, random_state=42)
-        
+        X_train, X_test, y_train, y_test = split_data(X, y, test_size=0.1, random_state=42)
+        # if os.path.exists(split_data_file):
+        #     # 从文件加载已划分的数据
+        #     print(f"从文件加载数据: {split_data_file}")
+        #     data = np.load(split_data_file, allow_pickle=True)
+        #     X_train = data['X_train']
+        #     X_test = data['X_test']
+        #     y_train = data['y_train']
+        #     y_test = data['y_test']
+        #     feature_columns = data['feature_columns'].tolist() if 'feature_columns' in data else None
+            
+        #     print(f"训练集大小: {X_train.shape[0]} 样本")
+        #     print(f"测试集大小: {X_test.shape[0]} 样本")
+        # else:
+        #     # 首次运行：加载原始数据并划分
+        #     print("首次运行，加载原始数据...")
+        #     X, y, feature_columns = load_and_prepare_data(csv_file, n_samples=None)
+            
+        #     # 划分训练集和测试集
+        #     X_train, X_test, y_train, y_test = split_data(X, y, test_size=0.2, random_state=42)
+            
+        #     # 保存划分后的数据
+        #     print(f"保存划分后的数据到: {split_data_file}")
+        #     np.savez_compressed(
+        #         split_data_file,
+        #         X_train=X_train,
+        #         X_test=X_test,
+        #         y_train=y_train,
+        #         y_test=y_test,
+        #         feature_columns=np.array(feature_columns, dtype=object)
+        #     )
         # # 定义要训练的模型类型
-        # models_to_train = ['decision_tree', 'random_forest']
-        # if XGBOOST_AVAILABLE:
-        #     models_to_train.append('xgboost')
-        models_to_train = ['decision_tree']
+        models_to_train = ['decision_tree', 'random_forest']
+        if XGBOOST_AVAILABLE:
+            models_to_train.append('xgboost')
+        # models_to_train = ['decision_tree']
         # 训练和评估所有模型
         all_results = {}
         for model_type in models_to_train:

@@ -1,0 +1,58 @@
+{
+  "model_info": {
+    "model_type": "random_forest",
+    "timestamp": "20251027_153104",
+    "feature_count": 35,
+    "feature_importance": {
+      "feature1": 0.0,
+      "feature2": 0.09777158729702203,
+      "feature3": 6.967532375087265e-06,
+      "feature4": 0.640188018856832,
+      "feature5": 0.0,
+      "feature6": 0.014064062394742345,
+      "feature7": 0.055857157941662836,
+      "feature8": 0.0,
+      "feature9": 1.1678191639892205e-05,
+      "feature10": 0.08745987711259004,
+      "feature11": 0.0009149658056878232,
+      "feature12": 0.0,
+      "feature13": 0.00413643977056143,
+      "feature14": 0.0,
+      "feature15": 0.0,
+      "feature16": 0.0,
+      "feature17": 0.005055375093244887,
+      "feature18": 0.0,
+      "feature19": 0.08908942083570436,
+      "feature20": 0.0,
+      "feature21": 0.005426163659605025,
+      "feature22": 1.8285508332268367e-05,
+      "feature23": 0.0,
+      "feature24": 0.0,
+      "feature25": 0.0,
+      "feature26": 0.0,
+      "feature27": 0.0,
+      "feature28": 0.0,
+      "feature29": 0.0,
+      "feature30": 0.0,
+      "feature31": 0.0,
+      "feature32": 0.0,
+      "feature33": 0.0,
+      "feature34": 0.0,
+      "feature35": 0.0
+    },
+    "n_estimators": 10,
+    "max_depth": 5
+  },
+  "train_metrics": {
+    "MSE": 0.00034073242689191955,
+    "RMSE": 0.01845893894274315,
+    "MAE": 0.009564304008843942,
+    "R²": 0.9808854834410712
+  },
+  "test_metrics": {
+    "MSE": 0.09928380547478077,
+    "RMSE": 0.31509332819782265,
+    "MAE": 0.26257014784502386,
+    "R²": -0.16873457822690519
+  }
+}

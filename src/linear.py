@@ -335,14 +335,43 @@ def main():
     
     # CSV文件路径
     csv_file = "./data/束流.csv"
-    
+    split_data_file = "./data/split_data.npz"
     try:
-        # 加载和准备数据（使用所有数据）
-        X, y, feature_columns = load_and_prepare_data(csv_file, n_samples=None)
+        # # 加载和准备数据（使用所有数据）
+        # X, y, feature_columns = load_and_prepare_data(csv_file, n_samples=None)
         
-        # 划分训练集和测试集
-        X_train, X_test, y_train, y_test = split_data(X, y, test_size=0.2, random_state=42)
-        
+        # # 划分训练集和测试集
+        # X_train, X_test, y_train, y_test = split_data(X, y, test_size=0.2, random_state=42)
+        if os.path.exists(split_data_file):
+            # 从文件加载已划分的数据
+            print(f"从文件加载数据: {split_data_file}")
+            data = np.load(split_data_file, allow_pickle=True)
+            X_train = data['X_train']
+            X_test = data['X_test']
+            y_train = data['y_train']
+            y_test = data['y_test']
+            feature_columns = data['feature_columns'].tolist() if 'feature_columns' in data else None
+            
+            print(f"训练集大小: {X_train.shape[0]} 样本")
+            print(f"测试集大小: {X_test.shape[0]} 样本")
+        else:
+            # 首次运行：加载原始数据并划分
+            print("首次运行，加载原始数据...")
+            X, y, feature_columns = load_and_prepare_data(csv_file, n_samples=None)
+            
+            # 划分训练集和测试集
+            X_train, X_test, y_train, y_test = split_data(X, y, test_size=0.2, random_state=42)
+            
+            # 保存划分后的数据
+            print(f"保存划分后的数据到: {split_data_file}")
+            np.savez_compressed(
+                split_data_file,
+                X_train=X_train,
+                X_test=X_test,
+                y_train=y_train,
+                y_test=y_test,
+                feature_columns=np.array(feature_columns, dtype=object)
+            )
         # 训练线性回归模型
         model = train_linear_regression(X_train, y_train)
         
