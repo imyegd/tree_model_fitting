@@ -1,20 +1,24 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-使用线性回归拟合束流数据
+使用多层感知机(MLP)拟合束流数据
 """
 
 import pandas as pd
 import numpy as np
-from sklearn.linear_model import LinearRegression
+from sklearn.neural_network import MLPRegressor
 from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
 from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
 import matplotlib
 import matplotlib.pyplot as plt
 import joblib
 import os
 import json
 from datetime import datetime
+import warnings
+warnings.filterwarnings('ignore')
+
 # 设置字体回退，让matplotlib自动选择可用字体
 matplotlib.rcParams['font.sans-serif'] = ['Microsoft YaHei']
 matplotlib.rcParams['axes.unicode_minus'] = False
@@ -22,7 +26,7 @@ matplotlib.rcParams['axes.unicode_minus'] = False
 def ensure_result_dir():
     """确保result目录存在"""
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    result_dir = f"./result/束流/linear/{timestamp}"
+    result_dir = f"./result/束流/mlp/{timestamp}"
     if not os.path.exists(result_dir):
         os.makedirs(result_dir)
         print(f"创建结果目录: {result_dir}")
@@ -107,46 +111,69 @@ def split_data(X, y, test_size=0.2, random_state=None):
     
     return X_train, X_test, y_train, y_test
 
-def train_linear_regression(X_train, y_train):
+def train_mlp(X_train, y_train, hidden_layer_sizes=(100,), max_iter=500, learning_rate_init=0.001):
     """
-    训练线性回归模型
+    训练MLP回归模型
     
     Args:
         X_train (numpy.ndarray): 训练特征矩阵
         y_train (numpy.ndarray): 训练目标变量
+        hidden_layer_sizes (tuple): 隐藏层大小
+        max_iter (int): 最大迭代次数
+        learning_rate_init (float): 初始学习率
     
     Returns:
-        LinearRegression: 训练好的模型
+        tuple: (MLPRegressor, StandardScaler) 训练好的模型和标准化器
     """
-    print("开始训练线性回归模型...")
+    print("开始训练MLP模型...")
     
-    # 创建线性回归模型
-    model = LinearRegression()
+    # 标准化特征（MLP对输入数据的尺度敏感）
+    scaler = StandardScaler()
+    X_train_scaled = scaler.fit_transform(X_train)
+    
+    # 创建MLP回归模型
+    model = MLPRegressor(
+        hidden_layer_sizes=hidden_layer_sizes,
+        activation='relu',
+        solver='adam',
+        alpha=0.0001,  # L2正则化参数
+        learning_rate_init=learning_rate_init,
+        max_iter=max_iter,
+        early_stopping=True,
+        validation_fraction=0.1,  # 从训练集中分出10%作为验证集
+        n_iter_no_change=10,  # 验证分数不改善时提前停止
+        random_state=42,
+        verbose=True
+    )
     
     # 训练模型
-    model.fit(X_train, y_train)
+    model.fit(X_train_scaled, y_train)
     
-    print("模型训练完成")
-    print(f"模型系数: {model.coef_}")
-    print(f"模型截距: {model.intercept_}")
+    print("MLP模型训练完成")
+    print(f"迭代次数: {model.n_iter_}")
+    print(f"损失值: {model.loss_:.6f}")
     
-    return model
+    return model, scaler
 
-def evaluate_model(model, X, y, dataset_name="数据集"):
+def evaluate_model(model, scaler, X, y, dataset_name="数据集"):
     """
     评估模型性能
     
     Args:
         model: 训练好的模型
+        scaler: 标准化器
         X (numpy.ndarray): 特征矩阵
         y (numpy.ndarray): 真实目标变量
         dataset_name (str): 数据集名称
     
     Returns:
-        dict: 评估指标字典
+        tuple: (metrics_dict, y_pred)
     """
+    # 标准化特征
+    X_scaled = scaler.transform(X)
+    
     # 预测
-    y_pred = model.predict(X)
+    y_pred = model.predict(X_scaled)
     
     # 计算评估指标
     mse = mean_squared_error(y, y_pred)
@@ -167,13 +194,14 @@ def evaluate_model(model, X, y, dataset_name="数据集"):
     
     return metrics, y_pred
 
-def save_model_and_results(model, train_metrics, test_metrics, feature_columns, 
+def save_model_and_results(model, scaler, train_metrics, test_metrics, feature_columns, 
                           y_train, y_train_pred, y_test, y_test_pred, result_dir):
     """
     保存模型和结果
     
     Args:
         model: 训练好的模型
+        scaler: 标准化器
         train_metrics (dict): 训练集评估指标
         test_metrics (dict): 测试集评估指标
         feature_columns (list): 特征列名
@@ -183,27 +211,36 @@ def save_model_and_results(model, train_metrics, test_metrics, feature_columns,
     """
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     
-    # 1. 保存模型
-    model_path = os.path.join(result_dir, f"linear_model_{timestamp}.pkl")
+    # 1. 保存模型和标准化器
+    model_path = os.path.join(result_dir, f"mlp_model_{timestamp}.pkl")
+    scaler_path = os.path.join(result_dir, f"mlp_scaler_{timestamp}.pkl")
+    
     joblib.dump(model, model_path)
+    joblib.dump(scaler, scaler_path)
     print(f"模型已保存到: {model_path}")
+    print(f"标准化器已保存到: {scaler_path}")
     
-    # 2. 保存特征重要性CSV
-    feature_importance_df = pd.DataFrame({
-        'feature': feature_columns,
-        'coefficient': model.coef_,
-        'abs_coefficient': np.abs(model.coef_)
-    }).sort_values('abs_coefficient', ascending=False)
+    # 2. 保存模型信息
+    model_info = {
+        'hidden_layer_sizes': model.hidden_layer_sizes,
+        'activation': model.activation,
+        'solver': model.solver,
+        'alpha': model.alpha,
+        'learning_rate_init': model.learning_rate_init,
+        'n_iter': model.n_iter_,
+        'loss': float(model.loss_)
+    }
     
-    importance_path = os.path.join(result_dir, f"linear_feature_importance_{timestamp}.csv")
-    feature_importance_df.to_csv(importance_path, index=False, encoding='utf-8')
-    print(f"特征重要性已保存到: {importance_path}")
+    info_path = os.path.join(result_dir, f"mlp_model_info_{timestamp}.json")
+    with open(info_path, 'w', encoding='utf-8') as f:
+        json.dump(model_info, f, indent=4, ensure_ascii=False)
+    print(f"模型信息已保存到: {info_path}")
     
     # 3. 保存评估指标到TXT文件
-    metrics_path = os.path.join(result_dir, f"linear_metrics_{timestamp}.txt")
+    metrics_path = os.path.join(result_dir, f"mlp_metrics_{timestamp}.txt")
     with open(metrics_path, 'w', encoding='utf-8') as f:
         f.write("=" * 50 + "\n")
-        f.write("线性回归模型评估结果\n")
+        f.write("MLP回归模型评估结果\n")
         f.write("=" * 50 + "\n\n")
         
         f.write("训练集评估结果:\n")
@@ -224,12 +261,13 @@ def save_model_and_results(model, train_metrics, test_metrics, feature_columns,
     
     return {
         'model_path': model_path,
-        'importance_path': importance_path,
+        'scaler_path': scaler_path,
+        'info_path': info_path,
         'metrics_path': metrics_path
     }
 
 def plot_results(y_train_true, y_train_pred, y_test_true, y_test_pred, 
-                feature_columns, model, result_dir, title="线性回归拟合结果"):
+                model, result_dir, title="MLP回归拟合结果"):
     """
     绘制拟合结果图
     
@@ -238,7 +276,6 @@ def plot_results(y_train_true, y_train_pred, y_test_true, y_test_pred,
         y_train_pred (numpy.ndarray): 训练集预测值
         y_test_true (numpy.ndarray): 测试集真实值
         y_test_pred (numpy.ndarray): 测试集预测值
-        feature_columns (list): 特征列名
         model: 训练好的模型
         result_dir (str): 结果保存目录
         title (str): 图表标题
@@ -284,18 +321,17 @@ def plot_results(y_train_true, y_train_pred, y_test_true, y_test_pred,
     ax3.legend()
     ax3.grid(True, alpha=0.3)
     
-    # 3. 特征重要性
+    # 3. 训练损失曲线（如果有的话）
     ax4 = plt.subplot(2, 3, 4)
-    feature_importance = np.abs(model.coef_)
-    top_features = min(10, len(feature_columns))
-    top_indices = np.argsort(feature_importance)[-top_features:]
-    
-    ax4.barh(range(top_features), feature_importance[top_indices])
-    ax4.set_yticks(range(top_features))
-    ax4.set_yticklabels([feature_columns[i] for i in top_indices])
-    ax4.set_xlabel('特征重要性（系数绝对值）')
-    ax4.set_title(f'前{top_features}个重要特征')
-    ax4.grid(True, alpha=0.3)
+    if hasattr(model, 'loss_curve_') and model.loss_curve_ is not None:
+        ax4.plot(model.loss_curve_, 'b-', linewidth=2)
+        ax4.set_xlabel('迭代次数')
+        ax4.set_ylabel('损失值')
+        ax4.set_title('训练损失曲线')
+        ax4.grid(True, alpha=0.3)
+    else:
+        ax4.text(0.5, 0.5, '无损失曲线数据', ha='center', va='center')
+        ax4.set_title('训练损失曲线')
     
     # 4. 预测值分布
     ax5 = plt.subplot(2, 3, 5)
@@ -321,7 +357,7 @@ def plot_results(y_train_true, y_train_pred, y_test_true, y_test_pred,
     plt.tight_layout()
     
     # 保存图片
-    plot_path = os.path.join(result_dir, f"linear_regression_analysis_{timestamp}.png")
+    plot_path = os.path.join(result_dir, f"mlp_analysis_{timestamp}.png")
     plt.savefig(plot_path, dpi=300, bbox_inches='tight')
     print(f"分析图已保存为: {plot_path}")
     
@@ -343,33 +379,30 @@ def main():
         # 划分训练集和测试集
         X_train, X_test, y_train, y_test = split_data(X, y, test_size=0.2, random_state=42)
         
-        # 训练线性回归模型
-        model = train_linear_regression(X_train, y_train)
+        # 训练MLP回归模型
+        model, scaler = train_mlp(
+            X_train, y_train, 
+            hidden_layer_sizes=(100, 50),  # 两个隐藏层：100和50个神经元
+            max_iter=1000,
+            learning_rate_init=0.001
+        )
         
         # 评估训练集性能
-        train_metrics, y_train_pred = evaluate_model(model, X_train, y_train, "训练集")
+        train_metrics, y_train_pred = evaluate_model(model, scaler, X_train, y_train, "训练集")
         
         # 评估测试集性能
-        test_metrics, y_test_pred = evaluate_model(model, X_test, y_test, "测试集")
-        
-        # 打印特征重要性（系数绝对值）
-        print("\n=== 特征重要性（按系数绝对值排序）===")
-        feature_importance = list(zip(feature_columns, np.abs(model.coef_)))
-        feature_importance.sort(key=lambda x: x[1], reverse=True)
-        
-        for i, (feature, importance) in enumerate(feature_importance[:10]):  # 显示前10个最重要的特征
-            print(f"{i+1:2d}. {feature}: {importance:.6f}")
+        test_metrics, y_test_pred = evaluate_model(model, scaler, X_test, y_test, "测试集")
         
         # 保存模型和结果
         saved_paths = save_model_and_results(
-            model, train_metrics, test_metrics, feature_columns,
+            model, scaler, train_metrics, test_metrics, feature_columns,
             y_train, y_train_pred, y_test, y_test_pred, result_dir
         )
         
         # 绘制结果图
         plot_path = plot_results(
             y_train, y_train_pred, y_test, y_test_pred,
-            feature_columns, model, result_dir
+            model, result_dir
         )
         
         print(f"\n=== 所有结果已保存到 {result_dir} ===")
@@ -378,7 +411,7 @@ def main():
             print(f"  {key}: {os.path.basename(path)}")
         print(f"  分析图: {os.path.basename(plot_path)}")
         
-        print("\n线性回归分析完成！")
+        print("\nMLP回归分析完成！")
         
     except Exception as e:
         print(f"程序执行过程中出现错误: {str(e)}")
