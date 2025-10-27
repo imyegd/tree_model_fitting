@@ -11,6 +11,7 @@ from sklearn.tree import DecisionTreeRegressor
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
 from sklearn.model_selection import train_test_split, GridSearchCV
+from sklearn.model_selection import BaseCrossValidator
 import matplotlib
 import matplotlib.pyplot as plt
 import joblib
@@ -69,6 +70,14 @@ def load_and_prepare_data(csv_file_path, n_samples=None):
     
     # 提取特征列（所有以feature开头的列）
     feature_columns = [col for col in df_subset.columns if col.startswith('feature')]
+    
+    # exclude_features = ['feature4']
+    # if exclude_features:
+    #     original_count = len(feature_columns)
+    #     feature_columns = [col for col in feature_columns if col not in exclude_features]
+    #     excluded = set(exclude_features) & set(feature_columns + exclude_features)
+    #     print(f"排除了特征: {excluded}")
+    #     print(f"特征数量: {original_count} -> {len(feature_columns)}")
     print(f"特征列: {feature_columns}")
     
     # 提取目标变量
@@ -258,6 +267,109 @@ def train_xgboost(X_train, y_train, n_estimators=100, max_depth=6, learning_rate
     
     return model
 
+class SequentialTimeSeriesSplit(BaseCrossValidator):
+    """
+    顺序时间序列交叉验证器
+    将数据按顺序划分为训练集和验证集
+    """
+    def __init__(self, n_splits=5, train_size=0.8):
+        self.n_splits = n_splits
+        self.train_size = train_size
+    
+    def split(self, X, y=None, groups=None):
+        """生成训练集和验证集的索引"""
+        n_samples = len(X)
+        indices = np.arange(n_samples)
+        
+        # 对于交叉验证，我们只做一次划分
+        # 因为时间序列数据通常不做多次重叠的划分
+        split_idx = int(n_samples * self.train_size)
+        
+        train_indices = indices[:split_idx]
+        test_indices = indices[split_idx:]
+        
+        yield train_indices, test_indices
+    
+    def get_n_splits(self, X=None, y=None, groups=None):
+        return 1  # 只返回一次划分
+# def hyperparameter_tuning(model_type, X_train, y_train, cv=5):
+#     """
+#     超参数调优
+    
+#     Args:
+#         model_type (str): 模型类型 ('decision_tree', 'random_forest', 'xgboost')
+#         X_train (numpy.ndarray): 训练特征矩阵
+#         y_train (numpy.ndarray): 训练目标变量
+#         cv (int): 交叉验证折数
+    
+#     Returns:
+#         调优后的最佳模型
+#     """
+#     print(f"开始对{model_type}进行超参数调优...")
+    
+#     if model_type == 'decision_tree':
+#         # param_grid = {
+#         #     'max_depth': [None, 10, 20, 30],
+#         #     'min_samples_split': [2, 5, 10],
+#         #     'min_samples_leaf': [1, 2, 4]
+#         # }
+#         param_grid = {
+#         'max_depth': [5, 8, 10, 12],  # 限制最大深度
+#         'min_samples_split': [10, 20, 50],  # 增加分裂所需的最小样本数
+#         'min_samples_leaf': [5, 10, 20]  # 增加叶子节点的最小样本数
+#     }
+#         base_model = DecisionTreeRegressor(random_state=42)
+        
+#     elif model_type == 'random_forest':
+#         # param_grid = {
+#         #     'n_estimators': [50, 100, 200],
+#         #     'max_depth': [None, 10, 20],
+#         #     'min_samples_split': [2, 5],
+#         #     'min_samples_leaf': [1, 2]
+#         # }
+#         param_grid = {
+#         'n_estimators': [50, 100, 200],
+#         'max_depth': [10, 20],  # 限制深度
+#         'min_samples_split': [5, 10],  # 增加分裂所需的最小样本
+#         'min_samples_leaf': [2, 5],  # 增加叶子节点的最小样本
+#         'max_features': ['sqrt', 'log2', 0.5]  # 这个有效！
+#     }
+#         base_model = RandomForestRegressor(random_state=42, n_jobs=-1)
+        
+#     elif model_type == 'xgboost' and XGBOOST_AVAILABLE:
+#         # param_grid = {
+#         #     'n_estimators': [50, 100, 200],
+#         #     'max_depth': [3, 6, 9],
+#         #     'learning_rate': [0.01, 0.1, 0.2],
+#         #     'subsample': [0.8, 0.9, 1.0]
+#         # }
+#         param_grid = {
+#         'n_estimators': [50, 100],  # 2个值
+#         'max_depth': [3, 4],  # 2个值
+#         'learning_rate': [0.01, 0.05],  # 2个值
+#         'colsample_bytree': [0.8],  # 固定为1个值
+#         'min_child_weight': [3],  # 固定为1个值
+#         'reg_alpha': [0],  # 固定为1个值
+#         'reg_lambda': [1, 2]  # 2个值
+#     }
+#         base_model = xgb.XGBRegressor(random_state=42, n_jobs=-1)
+        
+#     else:
+#         print(f"不支持的模型类型或XGBoost不可用: {model_type}")
+#         return None
+    
+#     # 网格搜索
+#     grid_search = GridSearchCV(
+#         base_model, param_grid, cv=cv, 
+#         scoring='neg_mean_squared_error', n_jobs=-1
+#     )
+    
+#     grid_search.fit(X_train, y_train)
+    
+#     print(f"最佳参数: {grid_search.best_params_}")
+#     print(f"最佳交叉验证分数: {-grid_search.best_score_:.6f}")
+    
+#     return grid_search.best_estimator_
 def hyperparameter_tuning(model_type, X_train, y_train, cv=5):
     """
     超参数调优
@@ -266,67 +378,50 @@ def hyperparameter_tuning(model_type, X_train, y_train, cv=5):
         model_type (str): 模型类型 ('decision_tree', 'random_forest', 'xgboost')
         X_train (numpy.ndarray): 训练特征矩阵
         y_train (numpy.ndarray): 训练目标变量
-        cv (int): 交叉验证折数
+        cv (int): 交叉验证折数（不使用，改为顺序划分）
     
     Returns:
         调优后的最佳模型
     """
     print(f"开始对{model_type}进行超参数调优...")
+    print("使用顺序划分：前80%为训练集，后20%为验证集")
     
     if model_type == 'decision_tree':
-        # param_grid = {
-        #     'max_depth': [None, 10, 20, 30],
-        #     'min_samples_split': [2, 5, 10],
-        #     'min_samples_leaf': [1, 2, 4]
-        # }
         param_grid = {
-        'max_depth': [5, 8, 10, 12],  # 限制最大深度
-        'min_samples_split': [10, 20, 50],  # 增加分裂所需的最小样本数
-        'min_samples_leaf': [5, 10, 20]  # 增加叶子节点的最小样本数
-    }
+            'max_depth': [None, 10, 20, 30],
+            'min_samples_split': [2, 5, 10],
+            'min_samples_leaf': [1, 2, 4]
+        }
         base_model = DecisionTreeRegressor(random_state=42)
         
     elif model_type == 'random_forest':
-        # param_grid = {
-        #     'n_estimators': [50, 100, 200],
-        #     'max_depth': [None, 10, 20],
-        #     'min_samples_split': [2, 5],
-        #     'min_samples_leaf': [1, 2]
-        # }
         param_grid = {
-        'n_estimators': [50, 100, 200],
-        'max_depth': [10, 20],  # 限制深度
-        'min_samples_split': [5, 10],  # 增加分裂所需的最小样本
-        'min_samples_leaf': [2, 5],  # 增加叶子节点的最小样本
-        'max_features': ['sqrt', 'log2', 0.5]  # 这个有效！
-    }
+            'n_estimators': [50, 100, 200],
+            'max_depth': [None, 10, 20],
+            'min_samples_split': [2, 5],
+            'min_samples_leaf': [1, 2]
+        }
         base_model = RandomForestRegressor(random_state=42, n_jobs=-1)
         
     elif model_type == 'xgboost' and XGBOOST_AVAILABLE:
-        # param_grid = {
-        #     'n_estimators': [50, 100, 200],
-        #     'max_depth': [3, 6, 9],
-        #     'learning_rate': [0.01, 0.1, 0.2],
-        #     'subsample': [0.8, 0.9, 1.0]
-        # }
         param_grid = {
-        'n_estimators': [50, 100],  # 2个值
-        'max_depth': [3, 4],  # 2个值
-        'learning_rate': [0.01, 0.05],  # 2个值
-        'colsample_bytree': [0.8],  # 固定为1个值
-        'min_child_weight': [3],  # 固定为1个值
-        'reg_alpha': [0],  # 固定为1个值
-        'reg_lambda': [1, 2]  # 2个值
-    }
+            'n_estimators': [50, 100, 200],
+            'max_depth': [3, 6, 9],
+            'learning_rate': [0.01, 0.1, 0.2],
+            'subsample': [0.8, 0.9, 1.0]
+        }
         base_model = xgb.XGBRegressor(random_state=42, n_jobs=-1)
         
     else:
         print(f"不支持的模型类型或XGBoost不可用: {model_type}")
         return None
     
+    # 使用顺序交叉验证器
+    cv_splitter = SequentialTimeSeriesSplit(n_splits=1, train_size=0.8)
+    
     # 网格搜索
     grid_search = GridSearchCV(
-        base_model, param_grid, cv=cv, 
+        base_model, param_grid, cv=cv_splitter, 
         scoring='neg_mean_squared_error', n_jobs=-1
     )
     
@@ -336,7 +431,6 @@ def hyperparameter_tuning(model_type, X_train, y_train, cv=5):
     print(f"最佳交叉验证分数: {-grid_search.best_score_:.6f}")
     
     return grid_search.best_estimator_
-
 def evaluate_model(model, X, y, dataset_name="数据集"):
     """
     评估模型性能
