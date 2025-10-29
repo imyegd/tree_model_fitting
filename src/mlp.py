@@ -372,15 +372,11 @@ def main():
     # CSV文件路径
     csv_file = "./data/束流.csv"
     split_data_file = "./data/split_data.npz"
+    scaler_file = "./data/scaler.pkl"  # 保存标准化器
+    
     try:
-        # # 加载和准备数据（使用所有数据）
-        # X, y, feature_columns = load_and_prepare_data(csv_file, n_samples=None)
-        
-        # # 划分训练集和测试集
-        # X_train, X_test, y_train, y_test = split_data(X, y, test_size=0.2, random_state=42)
-
-        if os.path.exists(split_data_file):
-            # 从文件加载已划分的数据
+        if os.path.exists(split_data_file) and os.path.exists(scaler_file):
+            # 从文件加载已划分和标准化的数据
             print(f"从文件加载数据: {split_data_file}")
             data = np.load(split_data_file, allow_pickle=True)
             X_train = data['X_train']
@@ -388,6 +384,10 @@ def main():
             y_train = data['y_train']
             y_test = data['y_test']
             feature_columns = data['feature_columns'].tolist() if 'feature_columns' in data else None
+            
+            # 加载标准化器
+            scaler = joblib.load(scaler_file)
+            print(f"加载标准化器: {scaler_file}")
             
             print(f"训练集大小: {X_train.shape[0]} 样本")
             print(f"测试集大小: {X_test.shape[0]} 样本")
@@ -399,8 +399,17 @@ def main():
             # 划分训练集和测试集
             X_train, X_test, y_train, y_test = split_data(X, y, test_size=0.2, random_state=42)
             
-            # 保存划分后的数据
-            print(f"保存划分后的数据到: {split_data_file}")
+            # 对特征进行标准化
+            print("对特征进行标准化...")
+            scaler = StandardScaler()
+            X_train = scaler.fit_transform(X_train)
+            X_test = scaler.transform(X_test)
+            
+            print(f"标准化完成 - 均值: {scaler.mean_[:5]}... (显示前5个)")
+            print(f"标准化完成 - 标准差: {scaler.scale_[:5]}... (显示前5个)")
+            
+            # 保存标准化后的数据和标准化器
+            print(f"保存标准化后的数据到: {split_data_file}")
             np.savez_compressed(
                 split_data_file,
                 X_train=X_train,
@@ -409,6 +418,10 @@ def main():
                 y_test=y_test,
                 feature_columns=np.array(feature_columns, dtype=object)
             )
+            
+            # 保存标准化器
+            joblib.dump(scaler, scaler_file)
+            print(f"保存标准化器到: {scaler_file}")
         # 训练MLP回归模型
         model, scaler = train_mlp(
             X_train, y_train, 
