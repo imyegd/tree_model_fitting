@@ -22,7 +22,6 @@ from datetime import datetime
 import warnings
 warnings.filterwarnings('ignore')
 
-# 设置字体回退，让matplotlib自动选择可用字体
 matplotlib.rcParams['font.sans-serif'] = ['Microsoft YaHei']
 matplotlib.rcParams['axes.unicode_minus'] = False
 
