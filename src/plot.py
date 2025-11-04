@@ -5,13 +5,13 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib
 import seaborn as sns
 from datetime import datetime
 import os
 
-# 设置中文字体
-plt.rcParams['font.sans-serif'] = ['Microsoft YaHei', 'SimHei']
-plt.rcParams['axes.unicode_minus'] = False
+matplotlib.rcParams['font.sans-serif'] = ['Microsoft YaHei']
+matplotlib.rcParams['axes.unicode_minus'] = False
 
 def plot_beam_position_data():
     """绘制束位数据图表"""
@@ -25,7 +25,6 @@ def plot_beam_position_data():
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     result_dir = f"./result/束位监测/position_analysis/{timestamp}"
     os.makedirs(result_dir, exist_ok=True)
-    
     # 1. 主要分析图 - 3x3布局
     fig = plt.figure(figsize=(20, 16))
     
