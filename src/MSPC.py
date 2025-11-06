@@ -15,8 +15,8 @@ np.random.seed(42)
 N_features = 35
 
 
-split_data_file = "./data/split_data.npz"
-scaler_file = "./data/scaler.pkl"
+split_data_file = "./data/processed/split_data.npz"
+scaler_file = "./data/processed/scaler.pkl"
 
 if os.path.exists(split_data_file) and os.path.exists(scaler_file):
     # 从文件加载已划分和标准化的数据
@@ -24,8 +24,10 @@ if os.path.exists(split_data_file) and os.path.exists(scaler_file):
     data = np.load(split_data_file, allow_pickle=True)
     # X_train = data['X_train'][3000:3300]
     # X_test = data['X_train'][3100:3400]2
-    X_train = data['X_train'][10000:]
+    X_train = data['X_train']
+    Y_train = data['y_train']
     X_test = data['X_test']
+    Y_test = data['y_test']
 
 df_train = pd.DataFrame(X_train, columns=[f'feature{i+1}' for i in range(N_features)])
 df_test = pd.DataFrame(X_test, columns=[f'feature{i+1}' for i in range(N_features)])

@@ -40,7 +40,7 @@ OUTPUT_SIZE = 2
 BATCH_SIZE = 64
 LEARNING_RATE = 0.001
 NUM_EPOCHS = 100
-PATIENCE = 10 # 早停容忍次数
+PATIENCE = 100 # 早停容忍次数
 DROPOUT_RATE = 0.2
 
 # 设备配置
@@ -76,7 +76,7 @@ class LSTMRegressor(nn.Module):
 
 # --- 3. 训练与评估函数 ---
 
-def train_model(model, train_loader, val_loader, criterion, optimizer, num_epochs=100, patience=100):
+def train_model(model, train_loader, val_loader, criterion, optimizer, num_epochs=100, patience=10):
     """PyTorch 模型训练循环，包含早停机制。"""
     best_loss = float('inf')
     patience_counter = 0
@@ -99,7 +99,7 @@ def train_model(model, train_loader, val_loader, criterion, optimizer, num_epoch
             best_loss = val_loss
             patience_counter = 0
             # 最佳模型状态保存 (如果需要)
-            # torch.save(model.state_dict(), 'models/best_lstm_model.pth')
+            torch.save(model.state_dict(), 'models/best_lstm_model.pth')
         else:
             patience_counter += 1
         
