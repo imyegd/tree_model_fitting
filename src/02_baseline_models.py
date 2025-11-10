@@ -2,23 +2,14 @@
 
 import pandas as pd
 import os
+import matplotlib.pyplot as plt
+import numpy as np
 from sklearn.linear_model import LinearRegression
 from sklearn.ensemble import RandomForestRegressor
 from xgboost import XGBRegressor
 from sklearn.multioutput import MultiOutputRegressor
 from sklearn.preprocessing import StandardScaler
 from utils import evaluate_model_performance 
-
-import pandas as pd
-import numpy as np
-import os
-import matplotlib.pyplot as plt
-from sklearn.linear_model import LinearRegression
-from sklearn.ensemble import RandomForestRegressor
-from xgboost import XGBRegressor
-from sklearn.multioutput import MultiOutputRegressor
-from sklearn.preprocessing import StandardScaler
-from utils import evaluate_model_performance
 
 # 定义文件路径
 PROCESSED_DATA_PATH = 'data/processed'
