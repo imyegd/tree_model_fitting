@@ -3,6 +3,7 @@ import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
 import os
+import joblib
 from sklearn.preprocessing import StandardScaler
 from sklearn.cross_decomposition import PLSRegression # 导入 PLS
 from scipy.stats import f, chi2
@@ -24,16 +25,17 @@ N_features = 35
 
 
 split_data_file = "./data/processed/split_data.npz"
-scaler_file = "./data/processed/scaler.pkl"
+model_dir = "./models"
+model_file = os.path.join(model_dir, "pls_model.pkl")
 
-if os.path.exists(split_data_file) and os.path.exists(scaler_file):
+if os.path.exists(split_data_file):
     # 从文件加载已划分和标准化的数据
     print(f"从文件加载数据: {split_data_file}")
     data = np.load(split_data_file, allow_pickle=True)
     # X_train = data['X_train'][3000:3300]
-    # X_test = data['X_train'][3100:3400]2
-    X_train = data['X_train'][2000:]
-    Y_train = data['y_train'][2000:]
+    # X_test = data['X_train'][3100:3400]
+    X_train = data['X_train'][10000:15000]
+    Y_train = data['y_train'][10000:15000]
     X_test = data['X_test']
     Y_test = data['y_test']
 
@@ -121,6 +123,23 @@ print(f"SPE_X 控制上限 (UCL_SPEX_approx, df={df_res}): {UCL_SPEX_approx:.4f}
 # (注: 更精确的 SPE 控制限计算需要使用残差协方差矩阵的特征值，此处使用简化的 $P-k$ 自由度近似。)
 
 # =================================================================
+# 保存模型与相关参数，便于后续独立测试脚本使用
+# =================================================================
+os.makedirs(model_dir, exist_ok=True)
+model_artifacts = {
+    'pls_model': pls,
+    'scaler_X': scaler_X,
+    'scaler_Y': scaler_Y,
+    'eigen_values_pls': eigen_values_pls,
+    'UCL_T2X': UCL_T2X,
+    'UCL_SPEX_approx': UCL_SPEX_approx,
+    'k': k,
+    'feature_names': df_train_X.columns.tolist()
+}
+joblib.dump(model_artifacts, model_file)
+print(f"\nPLS 模型与参数已保存至: {model_file}")
+
+# =================================================================
 # IV. 步骤四：监控和异常判断（计算 $T^2_X$ 和 $SPE_X$）
 # =================================================================
 
@@ -173,7 +192,7 @@ df_monitor = pd.DataFrame({
 
 # 找出第一个出现异常的点
 first_anomaly_index = df_monitor[df_monitor['T2X_Anomaly'] | df_monitor['SPEX_Anomaly']].index.min()
-if first_anomaly_index is not np.nan:
+if pd.notna(first_anomaly_index):
     
     print(f"\n第一个异常点出现在测试集索引 {first_anomaly_index}")
     
