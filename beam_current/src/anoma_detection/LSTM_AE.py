@@ -76,49 +76,81 @@ for epoch in range(20):
 #     diff = (X_reconstructed[:, -1, :] - X_tensor[:, -1, :]) ** 2
 #     reconstruction_errors = torch.mean(diff, dim=1).numpy()
 
-# 在你的代码第4步之后添加
+# 4. 异常检测与可视化
 model.eval()
 with torch.no_grad():
     X_reconstructed = model(X_tensor)
     # 计算所有特征的综合重建误差 (MSE)
     mse_errors = torch.mean((X_reconstructed[:, -1, :] - X_tensor[:, -1, :])**2, dim=1).numpy()
 
-# 绘制误差曲线
-plt.figure(figsize=(15, 5))
-plt.plot(mse_errors, label='Reconstruction Error (Anomaly Score)', color='orange')
 # 自动计算一个统计阈值（均值 + 3倍标准差）
-threshold = np.mean(mse_errors[:15000]) + 3 * np.std(mse_errors[:15000])
-plt.axhline(y=threshold, color='red', linestyle='--', label='Threshold')
-plt.title('Anomaly Score (LSTM-AE Reconstruction Error)')
-plt.xlabel('Time Step')
+threshold = np.mean(mse_errors[:15000]) + 8 * np.std(mse_errors[:15000])
+is_anomaly = (mse_errors > threshold).astype(int)
+
+# 提取target的原始值和重建值（target是第一个特征）
+target_actual = scaler.inverse_transform(X_tensor[:, -1, :].numpy())[:, 0]  # 第0列是target
+target_reconstructed = scaler.inverse_transform(X_reconstructed[:, -1, :].numpy())[:, 0]
+
+# 使用数值索引代替时间轴（避免datetime处理慢的问题）
+index_axis = np.arange(len(target_actual))
+
+# 创建可视化
+plt.figure(figsize=(15, 10))
+
+# 子图1：原始值 vs 重建值，标记异常点
+plt.subplot(2, 1, 1)
+plt.plot(index_axis, target_actual, label='Actual Target', alpha=0.7, linewidth=0.5)
+plt.plot(index_axis, target_reconstructed, label='Reconstructed Target', alpha=0.5, linestyle='--', linewidth=0.5)
+# 只标记异常点
+anomaly_indices = index_axis[is_anomaly == 1]
+plt.scatter(anomaly_indices, target_actual[is_anomaly == 1], 
+            color='red', s=10, label='Anomaly Detected', zorder=5)
+plt.title('LSTM-AE Anomaly Detection (Reconstruction Method)')
+plt.xlabel('Time Index')
+plt.ylabel('Target Value')
+plt.legend()
+plt.grid(True, alpha=0.3)
+
+# 子图2：重建误差曲线与阈值线
+plt.subplot(2, 1, 2)
+plt.plot(index_axis, mse_errors, label='Reconstruction Error', color='orange', linewidth=0.5)
+plt.axhline(y=threshold, color='red', linestyle='--', label=f'Threshold ({threshold:.6f})')
+plt.title('Reconstruction Error and Threshold')
+plt.xlabel('Time Index')
 plt.ylabel('MSE Error')
 plt.legend()
+plt.grid(True, alpha=0.3)
+
+plt.tight_layout(pad=1.0)
+plt.savefig('./result/anoma_detection/LSTM_AE.png')
 plt.show()
 
-# 选择你感兴趣的异常时间段
-start_idx, end_idx = 24000, 24150
-# 计算每个特征的平方误差
-detailed_errors = (X_reconstructed[start_idx:end_idx, -1, :] - X_tensor[start_idx:end_idx, -1, :])**2
-detailed_errors_np = detailed_errors.numpy()
+print(f"检测完成！共发现 {is_anomaly.sum()} 个异常点。")
+print(f"判定阈值为: {threshold:.6f}")
 
-# 绘图
-import seaborn as sns
-plt.figure(figsize=(15, 8))
-sns.heatmap(detailed_errors_np.T, yticklabels=all_cols, cmap='YlOrRd')
-plt.title(f'Feature Contribution Heatmap (From {start_idx} to {end_idx})')
-plt.xlabel('Relative Time Step')
-plt.ylabel('Features')
-plt.show()
-# 5. 诊断：计算特征贡献度
-# 误差最大的那个特征就是嫌疑人
-# feature_errors = (X_reconstructed[:, -1, :] - X_tensor[:, -1, :]) ** 2
-# # 假设我们要看第24000个点（异常点）
-# for i in range(24000, 24000+100):
-#     feature_errors = (X_reconstructed[i, -1, :] - X_tensor[i, -1, :]) ** 2
+# =============== 可选：特征贡献度分析（热图） ===============
+# 如果需要分析具体哪些特征导致了异常，可以取消下面的注释
+
+# # 选择你感兴趣的异常时间段
+# start_idx, end_idx = 24000, 24150
+# # 计算每个特征的平方误差
+# detailed_errors = (X_reconstructed[start_idx:end_idx, -1, :] - X_tensor[start_idx:end_idx, -1, :])**2
+# detailed_errors_np = detailed_errors.numpy()
+
+# # 绘制特征贡献热图
+# import seaborn as sns
+# plt.figure(figsize=(15, 8))
+# sns.heatmap(detailed_errors_np.T, yticklabels=all_cols, cmap='YlOrRd')
+# plt.title(f'Feature Contribution Heatmap (From {start_idx} to {end_idx})')
+# plt.xlabel('Relative Time Step')
+# plt.ylabel('Features')
+# plt.savefig('./result/anoma_detection/LSTM_AE_heatmap.png', dpi=300, bbox_inches='tight')
+# plt.show()
+
+# # 打印每个异常点最主要的贡献特征
+# anomaly_indices = np.where(is_anomaly == 1)[0]
+# print(f"\n异常点特征贡献分析（前10个异常点）:")
+# for idx in anomaly_indices[:10]:
+#     feature_errors = (X_reconstructed[idx, -1, :] - X_tensor[idx, -1, :]) ** 2
 #     top_contributors = np.argsort(feature_errors.numpy())[::-1]
-#     print(f"在点 {i} 处，重建误差最大的特征是: {[all_cols[i] for i in top_contributors[:3]]}")
-
-# anomaly_idx = 24000
-# top_contributors = np.argsort(feature_errors[anomaly_idx].numpy())[::-1]
-
-# print(f"在点 {anomaly_idx} 处，重建误差最大的特征是: {[all_cols[i] for i in top_contributors[:3]]}")
+#     print(f"时间点 {idx}: 主要贡献特征 {[all_cols[i] for i in top_contributors[:3]]}")

@@ -97,23 +97,61 @@ with torch.no_grad():
     # 计算综合重建误差
     vae_mse = torch.mean((recon_x_all[:, -1, :] - X_tensor[:, -1, :])**2, dim=1).numpy()
 
-# 绘制异常得分曲线
-plt.figure(figsize=(15, 5))
-plt.plot(vae_mse, color='purple', label='VAE Anomaly Score')
 # 设定阈值
-threshold = np.mean(vae_mse[:train_size]) + 3 * np.std(vae_mse[:train_size])
-plt.axhline(y=threshold, color='red', linestyle='--', label='Threshold')
-plt.title('Anomaly Detection using LSTM-VAE')
+threshold = np.mean(vae_mse[:train_size]) + 8 * np.std(vae_mse[:train_size])
+is_anomaly = (vae_mse > threshold).astype(int)
+
+# 提取target的原始值和重建值（target是第一个特征）
+target_actual = scaler.inverse_transform(X_tensor[:, -1, :].numpy())[:, 0]  # 第0列是target
+target_reconstructed = scaler.inverse_transform(recon_x_all[:, -1, :].numpy())[:, 0]
+
+# 使用数值索引代替时间轴（避免datetime处理慢的问题）
+index_axis = np.arange(len(target_actual))
+
+# 创建可视化
+plt.figure(figsize=(15, 10))
+
+# 子图1：原始值 vs 重建值，标记异常点
+plt.subplot(2, 1, 1)
+plt.plot(index_axis, target_actual, label='Actual Target', alpha=0.7, linewidth=0.5)
+plt.plot(index_axis, target_reconstructed, label='VAE Reconstructed', alpha=0.5, linestyle='--', linewidth=0.5)
+# 只标记异常点
+anomaly_indices = index_axis[is_anomaly == 1]
+plt.scatter(anomaly_indices, target_actual[is_anomaly == 1], 
+            color='red', s=10, label='Anomaly Detected', zorder=5)
+plt.title('LSTM-VAE Anomaly Detection (Reconstruction Method)')
+plt.xlabel('Time Index')
+plt.ylabel('Target Value')
 plt.legend()
+plt.grid(True, alpha=0.3)
+
+# 子图2：重建误差曲线与阈值线
+plt.subplot(2, 1, 2)
+plt.plot(index_axis, vae_mse, label='VAE Reconstruction Error', color='purple', linewidth=0.5)
+plt.axhline(y=threshold, color='red', linestyle='--', label=f'Threshold ({threshold:.6f})')
+plt.title('VAE Reconstruction Error and Threshold')
+plt.xlabel('Time Index')
+plt.ylabel('MSE Error')
+plt.legend()
+plt.grid(True, alpha=0.3)
+
+plt.tight_layout(pad=1.0)
+plt.savefig('./result/anoma_detection/LSTM_VAE.png')
 plt.show()
 
-# 6. 特征贡献热力图 (诊断)
-start_idx, end_idx = 24000, 24150
-detailed_errors = (recon_x_all[start_idx:end_idx, -1, :] - X_tensor[start_idx:end_idx, -1, :])**2
-detailed_errors_np = detailed_errors.numpy()
+print(f"检测完成！共发现 {is_anomaly.sum()} 个异常点。")
+print(f"判定阈值为: {threshold:.6f}")
 
-import seaborn as sns
-plt.figure(figsize=(15, 8))
-sns.heatmap(detailed_errors_np.T, yticklabels=all_cols, cmap='magma')
-plt.title(f'VAE Feature Contribution (From {start_idx} to {end_idx})')
-plt.show()
+# =============== 可选：特征贡献度分析（热图） ===============
+# 如果需要分析具体哪些特征导致了异常，可以取消下面的注释
+
+# start_idx, end_idx = 24000, 24150
+# detailed_errors = (recon_x_all[start_idx:end_idx, -1, :] - X_tensor[start_idx:end_idx, -1, :])**2
+# detailed_errors_np = detailed_errors.numpy()
+
+# import seaborn as sns
+# plt.figure(figsize=(15, 8))
+# sns.heatmap(detailed_errors_np.T, yticklabels=all_cols, cmap='magma')
+# plt.title(f'VAE Feature Contribution (From {start_idx} to {end_idx})')
+# plt.savefig('./result/anoma_detection/LSTM_VAE_heatmap.png', dpi=300, bbox_inches='tight')
+# plt.show()

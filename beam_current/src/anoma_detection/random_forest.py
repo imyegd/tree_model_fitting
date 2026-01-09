@@ -31,10 +31,53 @@ df['residual'] = (df[target] - df['target_pred']).abs()
 train_residuals = df['residual'].iloc[:train_size]
 mu = train_residuals.mean()
 sigma = train_residuals.std()
-threshold = mu + 3 * sigma
-
+threshold = mu + 30 * sigma
 # 标记异常：1为异常，0为正常
 df['is_anomaly'] = (df['residual'] > threshold).astype(int)
+
+
+import shap
+
+# --- 异常诊断部分开始 ---
+
+# 1. 筛选出异常样本
+anomalies = df[df['is_anomaly'] == 1]
+
+if len(anomalies) > 0:
+    print(f"正在对 {len(anomalies)} 个异常点进行 SHAP 归因诊断...")
+    
+    # 2. 创建 SHAP 解释器 (TreeExplainer 专门用于随机森林)
+    explainer = shap.TreeExplainer(model)
+    
+    # 为了计算速度，如果异常点太多，可以采样前 100 个
+    diagnosis_samples = anomalies[features].head(100) 
+    shap_values = explainer.shap_values(diagnosis_samples)
+    
+    # 3. 可视化诊断结果
+    # 摘要图：展示哪些变量对 target 偏离贡献最大
+    plt.figure(figsize=(10, 6))
+    shap.summary_plot(shap_values, diagnosis_samples, plot_type="bar", show=False)
+    plt.title("Feature Contribution to Anomalies (SHAP)")
+    plt.savefig('./result/anoma_detection/rf_shap_diagnosis.png')
+    plt.show()
+
+    # 4. 打印单个具体异常点的诊断 (例如第一个异常点)
+    print("\n第一个异常点的详细特征贡献排名:")
+    # 计算单个样本的 shap 绝对值贡献
+    sample_idx = 0
+    feature_importance = pd.DataFrame({
+        'feature': features,
+        'importance': np.abs(shap_values[sample_idx])
+    }).sort_values(by='importance', ascending=False)
+    
+    print(feature_importance.head(5))
+
+else:
+    print("未发现异常点，跳过诊断。")
+
+# --- 异常诊断部分结束 ---
+
+
 
 # 6. 可视化结果
 plt.figure(figsize=(15, 8))
@@ -57,6 +100,7 @@ plt.title('Residual Scores and Threshold')
 plt.legend()
 
 plt.tight_layout()
+plt.savefig('./result/anoma_detection/random_forest.png')
 plt.show()
 
 print(f"检测完成！共发现 {df['is_anomaly'].sum()} 个异常点。")

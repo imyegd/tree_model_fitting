@@ -88,7 +88,7 @@ residuals = np.abs(y_actual - y_pred).flatten()
 # 7. 基于统计学打标 (3-Sigma)
 # 只用训练段的残差来计算基准阈值
 train_res = residuals[:train_size]
-threshold = np.mean(train_res) + 3 * np.std(train_res)
+threshold = np.mean(train_res) + 30 * np.std(train_res)
 is_anomaly = (residuals > threshold).astype(int)
 
 # 8. 结果可视化
@@ -104,6 +104,67 @@ plt.scatter(time_axis[is_anomaly == 1], y_actual[is_anomaly == 1],
 plt.axhline(y=threshold, color='green', linestyle=':', label='Statistical Threshold')
 plt.title('PyTorch LSTM Anomaly Detection (Residual Method)')
 plt.legend()
+plt.savefig('./result/anoma_detection/LSTM.png')
 plt.show()
 
 print(f"检测完成，阈值设定为: {threshold:.4f}")
+
+import shap
+
+# --- 异常诊断部分：针对 23000-23500 点 ---
+
+print(f"\n正在针对 23000 到 23500 点进行 SHAP 诊断分析...")
+
+# 1. 准备背景数据集 (Background Dataset)
+# SHAP 需要一个参考分布，通常从训练集中随机抽取一部分
+background = X_tensor[:100].to(device) 
+
+# 2. 创建解释器
+# 对于 PyTorch 模型，DeepExplainer 是最常用的
+explainer = shap.GradientExplainer(model, background)
+
+# 3. 提取目标分析区间 (索引需要考虑 SEQ_LENGTH 的偏移)
+# 因为 X_tensor 的第 0 个元素对应原数据的第 50 个点 (SEQ_LENGTH)
+start_idx = 23000 - SEQ_LENGTH
+end_idx = 23050 - SEQ_LENGTH
+test_samples = X_tensor[start_idx:end_idx].to(device)
+
+# 4. 计算 SHAP 值
+# shap_values 的形状会是 (样本数, 时间步, 特征数)
+shap_values = explainer.shap_values(test_samples)
+if isinstance(shap_values, list):
+    shap_values = shap_values[0]
+
+# 5. 诊断可视化
+# 重点：因为 LSTM 输入是三维的，我们通常观察“最后一个时间步”对当前预测的影响
+# 或者是将时间步维度进行平均
+last_step_shap = shap_values[:, -1, :] # 取窗口中最后一个时间步的贡献
+last_step_data = test_samples[:, -1, :].cpu().numpy() # 对应的特征原始值
+
+# 5.1 摘要图 (Summary Plot)
+plt.figure(figsize=(10, 6))
+shap.summary_plot(last_step_shap, last_step_data, feature_names=feature_cols, show=False)
+plt.title(f"Feature Importance via SHAP (Points 23000-23500)")
+plt.savefig('./result/anoma_detection/LSTM_SHAP_Summary.png')
+plt.show()
+
+# 5.2 局部热力图 (观察这 500 个点内特征贡献的演变)
+plt.figure(figsize=(15, 8))
+# 转换为 DataFrame 方便绘图
+shap_df = pd.DataFrame(last_step_shap, columns=feature_cols)
+import seaborn as sns
+sns.heatmap(shap_df.T, cmap='RdBu_r', center=0)
+plt.title(f"SHAP Force Heatmap (Time 23000-23500)")
+plt.xlabel("Relative Time Step")
+plt.ylabel("Features")
+plt.savefig('./result/anoma_detection/LSTM_SHAP_Heatmap.png')
+plt.show()
+
+# 5.3 找出最可疑的特征
+mean_importance = np.abs(last_step_shap).mean(axis=0)
+top_feature_idx = np.argsort(mean_importance)[::-1][:5]
+print(f"该时间段内对 Target 影响最大的前 5 个特征是:")
+for i in top_feature_idx:
+    print(f"- {feature_cols[i]}: 平均贡献权重 {mean_importance[i]:.6f}")
+
+# --- 异常诊断部分结束 ---

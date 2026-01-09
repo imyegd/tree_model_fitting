@@ -46,6 +46,8 @@ plt.xlabel('Time Step')
 plt.legend()
 
 plt.tight_layout()
+plt.savefig('./result/anoma_detection/isolation_forest.png')
+
 plt.show()
 
 # 4. 异常诊断：通过 DIFFI 或简单的特征偏离度
