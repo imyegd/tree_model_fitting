@@ -4,33 +4,81 @@
 
 ## 项目结构
 
+项目已分为两个主要模块：**束流数据处理**和**束位监测数据处理**。
+
 ```
 tree_model_fitting/
-├── tree_fitting.py          # 主要的树模型拟合代码
-├── generate_data.py         # 数据生成脚本
+├── src/
+│   ├── beam_current/          # 束流数据处理模块
+│   │   ├── linear.py         # 线性回归模型
+│   │   ├── tree_model.py     # 树模型（决策树、随机森林、XGBoost）
+│   │   ├── mlp.py            # 多层感知机模型
+│   │   ├── LSTM.py           # LSTM模型
+│   │   ├── PLS.py            # 偏最小二乘模型
+│   │   └── data_process.py  # 数据处理脚本
+│   │
+│   ├── beam_position/        # 束位监测数据处理模块
+│   │   ├── 01_data_prep.py  # 数据预处理
+│   │   ├── 02_baseline_models.py  # 基线模型（线性回归、随机森林、XGBoost）
+│   │   ├── position.py      # 位置数据处理
+│   │   ├── plot.py          # 数据可视化
+│   │   ├── XGboost.py       # XGBoost模型
+│   │   └── PLS_test.py     # PLS测试脚本
+│   │
+│   ├── common/              # 共享工具模块
+│   │   └── utils.py        # 通用工具函数（时间处理、模型评估等）
+│   │
+│   └── utils/               # 其他工具脚本
+│       ├── convert_excel_to_csv.py
+│       ├── rename_columns.py
+│       ├── test.py
+│       ├── MSPC.py
+│       └── 03_pytorch_lstm.py
+│
+├── data/
+│   ├── raw/                 # 原始数据
+│   │   ├── 束流.csv
+│   │   ├── 束位数据.csv
+│   │   └── 束位监测数据.csv
+│   └── processed/           # 处理后的数据
+│
+├── models/                  # 保存的模型文件
+├── result/                  # 结果输出目录
+│   ├── 束流/               # 束流数据结果
+│   └── 束位监测/           # 束位监测数据结果
+│
 ├── requirements.txt         # 项目依赖
-├── README.md               # 项目说明文档
-├── regression_data.csv     # 回归示例数据（运行后生成）
-├── classification_data.csv # 分类示例数据（运行后生成）
-├── timeseries_data.csv     # 时间序列示例数据（运行后生成）
-├── categorical_data.csv    # 分类变量示例数据（运行后生成）
-└── best_model.pkl         # 训练好的最佳模型（运行后生成）
+└── README.md               # 项目说明文档
 ```
 
 ## 功能特性
 
-### 支持的树模型
+### 束流数据处理模块 (beam_current)
+- **线性回归**: 使用线性回归拟合束流数据
+- **树模型**: 支持决策树、随机森林、XGBoost
+- **神经网络**: MLP（多层感知机）和LSTM模型
+- **PLS模型**: 偏最小二乘回归
+- **数据分析**: 数据统计分析、相关性分析、异常值检测
+
+### 束位监测数据处理模块 (beam_position)
+- **数据预处理**: 时间对齐、特征工程、数据划分
+- **基线模型**: 线性回归、随机森林、XGBoost（多输出回归）
+- **XGBoost模型**: 专门针对束位监测数据的XGBoost实现
+- **PLS测试**: PLS模型测试和异常检测
+- **数据可视化**: 束位轨迹图、时间序列分析、异常值检测
+
+### 支持的模型
 - **决策树** (Decision Tree)
 - **随机森林** (Random Forest)
-- **梯度提升树** (Gradient Boosting)
-
-### 支持的任务类型
-- **回归任务**: 预测连续数值
-- **分类任务**: 预测离散类别
+- **梯度提升树** (Gradient Boosting / XGBoost)
+- **线性回归** (Linear Regression)
+- **多层感知机** (MLP)
+- **LSTM** (长短期记忆网络)
+- **PLS** (偏最小二乘回归)
 
 ### 主要功能
 - 数据加载和预处理
-- 多种树模型训练和比较
+- 多种模型训练和比较
 - 超参数调优
 - 模型性能评估
 - 特征重要性分析
@@ -45,52 +93,95 @@ pip install -r requirements.txt
 
 ## 快速开始
 
-### 1. 生成示例数据
+### 1. 安装依赖
 
 ```bash
-python generate_data.py
+pip install -r requirements.txt
 ```
 
-这将生成四种类型的示例数据：
-- `regression_data.csv`: 回归数据
-- `classification_data.csv`: 分类数据
-- `timeseries_data.csv`: 时间序列数据
-- `categorical_data.csv`: 包含分类变量的数据
+### 2. 束流数据处理
 
-### 2. 运行树模型拟合
-
+#### 2.1 数据预处理和分析
 ```bash
-python tree_fitting.py
+# 数据分析
+python src/beam_current/data_process.py
 ```
 
-### 3. 使用自定义数据
+#### 2.2 训练模型
+```bash
+# 线性回归
+python src/beam_current/linear.py
 
+# 树模型（决策树、随机森林、XGBoost）
+python src/beam_current/tree_model.py
+
+# MLP模型
+python src/beam_current/mlp.py
+
+# LSTM模型
+python src/beam_current/LSTM.py
+
+# PLS模型
+python src/beam_current/PLS.py
+```
+
+### 3. 束位监测数据处理
+
+#### 3.1 数据预处理
+```bash
+# 数据预处理（生成训练集和测试集）
+python src/beam_position/01_data_prep.py
+```
+
+#### 3.2 训练基线模型
+```bash
+# 训练线性回归、随机森林、XGBoost基线模型
+python src/beam_position/02_baseline_models.py
+```
+
+#### 3.3 其他模型和可视化
+```bash
+# XGBoost模型
+python src/beam_position/XGboost.py
+
+# PLS测试
+python src/beam_position/PLS_test.py
+
+# 数据可视化
+python src/beam_position/plot.py
+```
+
+### 4. 使用示例
+
+#### 束流数据 - 线性回归
 ```python
-from tree_fitting import TreeModelFitting
-
-# 创建回归任务实例
-regressor = TreeModelFitting(task_type='regression')
+from src.beam_current.linear import train_linear_regression, evaluate_model
 
 # 加载数据
-regressor.load_data('your_data.csv', target_column='target')
-
-# 数据预处理
-regressor.preprocess_data()
+X_train, X_test, y_train, y_test = load_data()
 
 # 训练模型
-regressor.train_models()
-
-# 超参数调优
-regressor.hyperparameter_tuning('随机森林')
+model = train_linear_regression(X_train, y_train)
 
 # 评估模型
-regressor.evaluate_model()
+metrics, y_pred = evaluate_model(model, X_test, y_test)
+```
 
-# 绘制特征重要性
-regressor.plot_feature_importance()
+#### 束位监测数据 - 基线模型
+```python
+from src.beam_position import load_processed_data
+from src.beam_position import train_and_evaluate_model
+from sklearn.linear_model import LinearRegression
 
-# 保存模型
-regressor.save_model('my_model.pkl')
+# 加载预处理后的数据
+X_train, X_test, y_train, y_test = load_processed_data()
+
+# 训练线性回归模型
+lr_model = LinearRegression()
+results = train_and_evaluate_model(
+    lr_model, X_train, X_test, y_train, y_test, 
+    "Linear Regression", use_scaler=True
+)
 ```
 
 ## 详细使用说明

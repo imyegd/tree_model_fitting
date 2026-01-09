@@ -1,0 +1,59 @@
+{
+  "model_info": {
+    "model_type": "xgboost",
+    "timestamp": "20251027_152624",
+    "feature_count": 35,
+    "feature_importance": {
+      "feature1": 0.0,
+      "feature2": 0.07440348714590073,
+      "feature3": 0.0024388509336858988,
+      "feature4": 0.36403584480285645,
+      "feature5": 0.0,
+      "feature6": 0.010959859937429428,
+      "feature7": 0.016082022339105606,
+      "feature8": 0.0,
+      "feature9": 0.0002885660796891898,
+      "feature10": 0.08872964233160019,
+      "feature11": 0.0042733061127364635,
+      "feature12": 0.0,
+      "feature13": 0.01486525684595108,
+      "feature14": 7.080520299496129e-05,
+      "feature15": 0.0,
+      "feature16": 0.0,
+      "feature17": 0.0,
+      "feature18": 0.0,
+      "feature19": 0.343403160572052,
+      "feature20": 0.0005480490508489311,
+      "feature21": 0.07990116626024246,
+      "feature22": 0.0,
+      "feature23": 0.0,
+      "feature24": 0.0,
+      "feature25": 0.0,
+      "feature26": 0.0,
+      "feature27": 0.0,
+      "feature28": 0.0,
+      "feature29": 0.0,
+      "feature30": 0.0,
+      "feature31": 0.0,
+      "feature32": 0.0,
+      "feature33": 0.0,
+      "feature34": 0.0,
+      "feature35": 0.0
+    },
+    "n_estimators": 100,
+    "max_depth": 3,
+    "learning_rate": 0.05
+  },
+  "train_metrics": {
+    "MSE": 0.00013392289941052327,
+    "RMSE": 0.011572506185374164,
+    "MAE": 0.006472451464510327,
+    "R²": 0.9872389624605528
+  },
+  "test_metrics": {
+    "MSE": 0.04529565932717819,
+    "RMSE": 0.2128277691636554,
+    "MAE": 0.18389760000596653,
+    "R²": 0.45576612720750187
+  }
+}
