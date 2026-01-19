@@ -3,6 +3,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.preprocessing import StandardScaler
+import joblib
+import json
+import os
+from datetime import datetime
 
 # 1. 加载数据 (假设文件名是 data.csv)
 df = pd.read_csv('data/raw/束流.csv', parse_dates=['时间'])
@@ -21,6 +25,41 @@ print("正在训练基准模型...")
 model = RandomForestRegressor(n_estimators=100, random_state=42, n_jobs=-1)
 model.fit(X_train, y_train)
 
+# ========== 保存模型 ==========
+model_save_dir = './result/anomaly_detection_models'
+if not os.path.exists(model_save_dir):
+    os.makedirs(model_save_dir)
+    print(f"创建模型保存目录: {model_save_dir}")
+
+timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+# 保存模型
+model_path = os.path.join(model_save_dir, f'random_forest_model_{timestamp}.pkl')
+joblib.dump(model, model_path)
+print(f"✓ 模型已保存: {model_path}")
+
+# 保存模型配置信息
+config = {
+    'model_type': 'RandomForestRegressor',
+    'model_name': 'Anomaly_Detection_RandomForest',
+    'timestamp': timestamp,
+    'parameters': {
+        'n_estimators': 100,
+        'random_state': 42,
+        'train_size': train_size
+    },
+    'features': features,
+    'target': target,
+    'detection_method': 'residual_based',
+    'threshold_method': '3-sigma (mean + 30*std)'
+}
+
+config_path = os.path.join(model_save_dir, f'random_forest_config_{timestamp}.json')
+with open(config_path, 'w', encoding='utf-8') as f:
+    json.dump(config, f, indent=4, ensure_ascii=False)
+print(f"✓ 配置已保存: {config_path}")
+# ==============================
+
 # 4. 对全量数据进行预测并计算残差
 print("正在计算全量数据残差...")
 df['target_pred'] = model.predict(df[features])
@@ -34,6 +73,18 @@ sigma = train_residuals.std()
 threshold = mu + 30 * sigma
 # 标记异常：1为异常，0为正常
 df['is_anomaly'] = (df['residual'] > threshold).astype(int)
+
+# 保存阈值信息
+threshold_info = {
+    'threshold': float(threshold),
+    'mu': float(mu),
+    'sigma': float(sigma),
+    'n_sigma': 30
+}
+threshold_path = os.path.join(model_save_dir, f'random_forest_threshold_{timestamp}.json')
+with open(threshold_path, 'w', encoding='utf-8') as f:
+    json.dump(threshold_info, f, indent=4)
+print(f"✓ 阈值信息已保存: {threshold_path}")
 
 
 import shap

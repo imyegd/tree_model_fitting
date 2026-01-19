@@ -3,6 +3,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.ensemble import IsolationForest
 from sklearn.preprocessing import StandardScaler
+import joblib
+import json
+import os
+from datetime import datetime
 
 # 1. 数据准备
 df = pd.read_csv('data/raw/束流.csv')
@@ -26,6 +30,45 @@ print("正在训练孤立森林...")
 df['anomaly_label'] = iso_forest.fit_predict(data_scaled)
 # 计算异常得分：得分越小（越负）说明越异常
 df['anomaly_score'] = iso_forest.decision_function(data_scaled)
+
+# ========== 保存模型 ==========
+model_save_dir = './result/anomaly_detection_models'
+if not os.path.exists(model_save_dir):
+    os.makedirs(model_save_dir)
+    print(f"创建模型保存目录: {model_save_dir}")
+
+timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+# 保存模型
+model_path = os.path.join(model_save_dir, f'isolation_forest_model.pkl')
+joblib.dump(iso_forest, model_path)
+print(f"✓ 模型已保存: {model_path}")
+
+# 保存scaler
+scaler_path = os.path.join(model_save_dir, f'isolation_forest_scaler.pkl')
+joblib.dump(scaler, scaler_path)
+print(f"✓ Scaler已保存: {scaler_path}")
+
+# 保存模型配置信息
+config = {
+    'model_type': 'IsolationForest',
+    'model_name': 'Anomaly_Detection_IsolationForest',
+    'timestamp': timestamp,
+    'parameters': {
+        'n_estimators': 100,
+        'contamination': 0.01,
+        'random_state': 42
+    },
+    'features': all_cols,
+    'detection_method': 'isolation_based',
+    'description': 'Anomaly score: lower (more negative) means more anomalous'
+}
+
+config_path = os.path.join(model_save_dir, f'isolation_forest_config.json')
+with open(config_path, 'w', encoding='utf-8') as f:
+    json.dump(config, f, indent=4, ensure_ascii=False)
+print(f"✓ 配置已保存: {config_path}")
+# ==============================
 
 # 3. 可视化异常得分与原始曲线
 plt.figure(figsize=(15, 7))

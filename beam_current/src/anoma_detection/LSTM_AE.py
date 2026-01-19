@@ -5,6 +5,10 @@ import pandas as pd
 from sklearn.preprocessing import MinMaxScaler
 from torch.utils.data import DataLoader, TensorDataset
 import matplotlib.pyplot as plt
+import joblib
+import json
+import os
+from datetime import datetime
 
 # 1. 数据准备
 df = pd.read_csv('data/raw/束流.csv')
@@ -67,6 +71,56 @@ for epoch in range(20):
         optimizer.step()
     print(f"Epoch {epoch+1}, Loss: {loss.item():.6f}")
 
+# ========== 保存模型 ==========
+model_save_dir = './result/anomaly_detection_models'
+if not os.path.exists(model_save_dir):
+    os.makedirs(model_save_dir)
+    print(f"创建模型保存目录: {model_save_dir}")
+
+timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+# 保存PyTorch模型
+model_path = os.path.join(model_save_dir, f'lstm_ae_model_{timestamp}.pth')
+torch.save({
+    'model_state_dict': model.state_dict(),
+    'model_architecture': {
+        'n_features': 36,
+        'embedding_dim': 16
+    },
+    'seq_length': SEQ_LEN
+}, model_path)
+print(f"✓ LSTM-AE模型已保存: {model_path}")
+
+# 保存scaler
+scaler_path = os.path.join(model_save_dir, f'lstm_ae_scaler_{timestamp}.pkl')
+joblib.dump(scaler, scaler_path)
+print(f"✓ Scaler已保存: {scaler_path}")
+
+# 保存模型配置信息
+config = {
+    'model_type': 'LSTM_AutoEncoder',
+    'model_name': 'Anomaly_Detection_LSTM_AE',
+    'timestamp': timestamp,
+    'parameters': {
+        'n_features': 36,
+        'embedding_dim': 16,
+        'seq_length': SEQ_LEN,
+        'train_size': 15000,
+        'epochs': 20,
+        'batch_size': 64,
+        'learning_rate': 0.001
+    },
+    'features': all_cols,
+    'detection_method': 'reconstruction_error',
+    'threshold_method': '8-sigma (mean + 8*std)'
+}
+
+config_path = os.path.join(model_save_dir, f'lstm_ae_config_{timestamp}.json')
+with open(config_path, 'w', encoding='utf-8') as f:
+    json.dump(config, f, indent=4, ensure_ascii=False)
+print(f"✓ 配置已保存: {config_path}")
+# ==============================
+
 # 4. 异常检测 (计算重建误差)
 # model.eval()
 # with torch.no_grad():
@@ -83,9 +137,21 @@ with torch.no_grad():
     # 计算所有特征的综合重建误差 (MSE)
     mse_errors = torch.mean((X_reconstructed[:, -1, :] - X_tensor[:, -1, :])**2, dim=1).numpy()
 
-# 自动计算一个统计阈值（均值 + 3倍标准差）
+# 自动计算一个统计阈值（均值 + 8倍标准差）
 threshold = np.mean(mse_errors[:15000]) + 8 * np.std(mse_errors[:15000])
 is_anomaly = (mse_errors > threshold).astype(int)
+
+# 保存阈值信息
+threshold_info = {
+    'threshold': float(threshold),
+    'mean': float(np.mean(mse_errors[:15000])),
+    'std': float(np.std(mse_errors[:15000])),
+    'n_sigma': 8
+}
+threshold_path = os.path.join(model_save_dir, f'lstm_ae_threshold_{timestamp}.json')
+with open(threshold_path, 'w', encoding='utf-8') as f:
+    json.dump(threshold_info, f, indent=4)
+print(f"✓ 阈值信息已保存: {threshold_path}")
 
 # 提取target的原始值和重建值（target是第一个特征）
 target_actual = scaler.inverse_transform(X_tensor[:, -1, :].numpy())[:, 0]  # 第0列是target
@@ -128,29 +194,53 @@ plt.show()
 print(f"检测完成！共发现 {is_anomaly.sum()} 个异常点。")
 print(f"判定阈值为: {threshold:.6f}")
 
-# =============== 可选：特征贡献度分析（热图） ===============
-# 如果需要分析具体哪些特征导致了异常，可以取消下面的注释
+# =============================================================
+# 指定时间段（25000-25500）的异常深度诊断
+# =============================================================
 
-# # 选择你感兴趣的异常时间段
-# start_idx, end_idx = 24000, 24150
-# # 计算每个特征的平方误差
-# detailed_errors = (X_reconstructed[start_idx:end_idx, -1, :] - X_tensor[start_idx:end_idx, -1, :])**2
-# detailed_errors_np = detailed_errors.numpy()
+target_start, target_end = 25000, 25500
 
-# # 绘制特征贡献热图
-# import seaborn as sns
-# plt.figure(figsize=(15, 8))
-# sns.heatmap(detailed_errors_np.T, yticklabels=all_cols, cmap='YlOrRd')
-# plt.title(f'Feature Contribution Heatmap (From {start_idx} to {end_idx})')
-# plt.xlabel('Relative Time Step')
-# plt.ylabel('Features')
-# plt.savefig('./result/anoma_detection/LSTM_AE_heatmap.png', dpi=300, bbox_inches='tight')
-# plt.show()
+# 1. 提取该时间段的详细误差数据
+# 注意：X_reconstructed 和 X_tensor 已经包含了 SEQ_LEN 的偏移
+# 如果您要对应的原始 CSV 索引是 25000，这里需要根据数据对齐情况微调
+detailed_errors = (X_reconstructed[target_start:target_end, -1, :] - X_tensor[target_start:target_end, -1, :])**2
+detailed_errors_np = detailed_errors.numpy()
 
-# # 打印每个异常点最主要的贡献特征
-# anomaly_indices = np.where(is_anomaly == 1)[0]
-# print(f"\n异常点特征贡献分析（前10个异常点）:")
-# for idx in anomaly_indices[:10]:
-#     feature_errors = (X_reconstructed[idx, -1, :] - X_tensor[idx, -1, :]) ** 2
-#     top_contributors = np.argsort(feature_errors.numpy())[::-1]
-#     print(f"时间点 {idx}: 主要贡献特征 {[all_cols[i] for i in top_contributors[:3]]}")
+# 2. 绘制特征贡献热图
+import seaborn as sns
+
+plt.figure(figsize=(16, 10))
+# 对转置后的数据画热力图，行是特征，列是时间步
+ax = sns.heatmap(detailed_errors_np.T, 
+                 yticklabels=all_cols, 
+                 cmap='YlOrRd', 
+                 cbar_kws={'label': 'Reconstruction Error (MSE)'})
+
+plt.title(f'Root Cause Analysis: Feature Contribution Heatmap (Indices {target_start}-{target_end})', fontsize=15)
+plt.xlabel('Relative Time Steps (within the segment)', fontsize=12)
+plt.ylabel('Features', fontsize=12)
+
+# 优化坐标轴显示：每隔50个点显示一个刻度
+plt.xticks(np.arange(0, target_end-target_start, 50), np.arange(target_start, target_end, 50))
+
+plt.savefig(f'./result/anoma_detection/LSTM_AE_Diagnosis_{target_start}_{target_end}.png', dpi=300, bbox_inches='tight')
+plt.show()
+
+# 3. 统计该段内的核心影响因子
+# 计算该时段内各特征的平均重建误差并排序
+mean_errors_by_feature = np.mean(detailed_errors_np, axis=0)
+top_indices = np.argsort(mean_errors_by_feature)[::-1]
+
+print(f"\n--- 时间段 {target_start} 到 {target_end} 诊断报告 ---")
+print(f"{'排名':<6} {'特征名称':<15} {'平均重建误差':<15}")
+for i, idx in enumerate(top_indices[:5]):  # 展示前5个
+    print(f"{i+1:<6} {all_cols[idx]:<15} {mean_errors_by_feature[idx]:.8f}")
+
+# 4. 找到该段内最严重的异常时刻点进行精准剖析
+max_error_idx = np.argmax(np.mean(detailed_errors_np, axis=1))
+global_idx = target_start + max_error_idx
+point_errors = detailed_errors_np[max_error_idx]
+top_point_indices = np.argsort(point_errors)[::-1]
+
+print(f"\n该时段内最严重的异常点发生在全局索引: {global_idx}")
+print(f"该点主要诱发特征: {[all_cols[i] for i in top_point_indices[:3]]}")

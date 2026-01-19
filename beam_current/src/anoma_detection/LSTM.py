@@ -5,6 +5,10 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import MinMaxScaler
 from torch.utils.data import DataLoader, TensorDataset
+import joblib
+import json
+import os
+from datetime import datetime
 
 # 1. 设备配置 (GPU/CPU)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -73,6 +77,65 @@ for epoch in range(30): # 根据损失情况调整 epoch
     if (epoch+1) % 5 == 0:
         print(f'Epoch [{epoch+1}/30], Loss: {loss.item():.6f}')
 
+# ========== 保存模型 ==========
+model_save_dir = './result/anomaly_detection_models'
+if not os.path.exists(model_save_dir):
+    os.makedirs(model_save_dir)
+    print(f"创建模型保存目录: {model_save_dir}")
+
+timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+# 保存PyTorch模型
+model_path = os.path.join(model_save_dir, f'lstm_model.pth')
+torch.save({
+    'model_state_dict': model.state_dict(),
+    'model_architecture': {
+        'input_dim': 35,
+        'hidden_dim': 64,
+        'num_layers': 2,
+        'output_dim': 1
+    },
+    'seq_length': SEQ_LENGTH
+}, model_path)
+print(f"✓ LSTM模型已保存: {model_path}")
+
+# 保存scalers
+scaler_x_path = os.path.join(model_save_dir, f'lstm_scaler_x.pkl')
+scaler_y_path = os.path.join(model_save_dir, f'lstm_scaler_y.pkl')
+joblib.dump(scaler_x, scaler_x_path)
+joblib.dump(scaler_y, scaler_y_path)
+print(f"✓ Scaler_X已保存: {scaler_x_path}")
+print(f"✓ Scaler_Y已保存: {scaler_y_path}")
+
+# 保存模型配置信息
+config = {
+    'model_type': 'LSTM_Regressor',
+    'model_name': 'Anomaly_Detection_LSTM',
+    'timestamp': timestamp,
+    'parameters': {
+        'input_dim': 35,
+        'hidden_dim': 64,
+        'num_layers': 2,
+        'output_dim': 1,
+        'seq_length': SEQ_LENGTH,
+        'train_size': train_size,
+        'epochs': 30,
+        'batch_size': 64,
+        'learning_rate': 0.001
+    },
+    'features': feature_cols,
+    'target': target_col,
+    'detection_method': 'residual_based',
+    'threshold_method': '3-sigma (mean + 30*std)',
+    'device': str(device)
+}
+
+config_path = os.path.join(model_save_dir, f'lstm_config.json')
+with open(config_path, 'w', encoding='utf-8') as f:
+    json.dump(config, f, indent=4, ensure_ascii=False)
+print(f"✓ 配置已保存: {config_path}")
+# ==============================
+
 # 6. 全量预测与残差计算
 model.eval()
 with torch.no_grad():
@@ -90,6 +153,18 @@ residuals = np.abs(y_actual - y_pred).flatten()
 train_res = residuals[:train_size]
 threshold = np.mean(train_res) + 30 * np.std(train_res)
 is_anomaly = (residuals > threshold).astype(int)
+
+# 保存阈值信息
+threshold_info = {
+    'threshold': float(threshold),
+    'mean': float(np.mean(train_res)),
+    'std': float(np.std(train_res)),
+    'n_sigma': 30
+}
+threshold_path = os.path.join(model_save_dir, f'lstm_threshold.json')
+with open(threshold_path, 'w', encoding='utf-8') as f:
+    json.dump(threshold_info, f, indent=4)
+print(f"✓ 阈值信息已保存: {threshold_path}")
 
 # 8. 结果可视化
 plt.figure(figsize=(15, 6))
