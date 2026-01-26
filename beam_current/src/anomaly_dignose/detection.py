@@ -36,7 +36,7 @@ sigma_normal = baseline_target.std()
 print(f"Normal mean: {mu_normal:.4f}, std: {sigma_normal:.4f}")
 
 # 保存正常范围参数
-np.save("data/processed/normal_stats.npy", {
+np.save("models/normal_stats.npy", {
     "mu": mu_normal,
     "sigma": sigma_normal
 })
@@ -114,8 +114,38 @@ for name, model in models.items():
         "R2": r2
     })
 
-    joblib.dump(model, f"artifacts/{name}_regressor.pkl")
+    joblib.dump(model, f"models/{name}_regressor.pkl")
 
 reg_results = pd.DataFrame(reg_results)
 print(reg_results)
+
+df["true_anomaly"] = (
+    (df[target_col] - mu_normal).abs() > 3 * sigma_normal
+).astype(int)
+
+clf_results = []
+
+for name in models.keys():
+    model = joblib.load(f"models/{name}_regressor.pkl")
+    y_pred_all = model.predict(X)
+
+    df[f"{name}_pred"] = y_pred_all
+    df[f"{name}_anomaly"] = (np.abs(y_pred_all - mu_normal) > 3 * sigma_normal).astype(int)
+
+    acc = accuracy_score(df["true_anomaly"], df[f"{name}_anomaly"])
+    prec = precision_score(df["true_anomaly"], df[f"{name}_anomaly"], zero_division=0)
+    rec = recall_score(df["true_anomaly"], df[f"{name}_anomaly"])
+    f1 = f1_score(df["true_anomaly"], df[f"{name}_anomaly"])
+
+    clf_results.append({
+        "model": name,
+        "ACC": acc,
+        "Precision": prec,
+        "Recall": rec,
+        "F1": f1
+    })
+
+clf_results = pd.DataFrame(clf_results)
+print(clf_results)
+
 
