@@ -126,6 +126,12 @@ for epoch in range(EPOCHS):
 model.load_state_dict(best_state)
 model.eval()
 
+# 保存模型
+import os
+os.makedirs("models", exist_ok=True)
+torch.save(model.state_dict(), "models/ae_model.pt")
+print("模型已保存到 models/ae_model.pt")
+
 # ======================
 # 8. 异常区间重构
 # ======================

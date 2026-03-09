@@ -359,61 +359,39 @@ def hyperparameter_tuning(model_type, X_train, y_train, cv=5):
     print(f"开始对{model_type}进行超参数调优...")
     
     if model_type == 'decision_tree':
+        # 2×3×2 = 12
         param_grid = {
-            'max_depth': [3, 5, 10, 20, 30],
-            'min_samples_split': [2, 5, 10],
-            'min_samples_leaf': [1, 2, 4]
+            'max_depth':          [5, 10],
+            'min_samples_split':  [2, 5, 10],
+            'min_samples_leaf':   [1, 4],
         }
-        # param_grid = {
-        #     'max_depth': [3, 5, 8],
-        #     'min_samples_split': [2, 5, 10],
-        #     'min_samples_leaf': [1, 2, 4]
-        # }
         base_model = DecisionTreeRegressor(random_state=42)
-        
+
     elif model_type == 'random_forest':
-        # param_grid = {
-        #     'n_estimators': [50, 100, 200],
-        #     'max_depth': [None, 10, 20],
-        #     'min_samples_split': [2, 5],
-        #     'min_samples_leaf': [1, 2]
-        # }
+        # 2×3×2 = 12
         param_grid = {
-        'n_estimators': [10, 50, 100],
-        'max_depth': [5, 10, 20],  # 限制深度
-        'min_samples_split': [5, 10],  # 增加分裂所需的最小样本
-        'min_samples_leaf': [2, 5],  # 增加叶子节点的最小样本
-        'max_features': ['sqrt', 'log2', 0.5]  
-    }
+            'n_estimators':    [50, 100],
+            'max_depth':       [5, 10, 20],
+            'min_samples_leaf': [2, 5],
+        }
         base_model = RandomForestRegressor(random_state=42, n_jobs=-1)
-        
+
     elif model_type == 'gradient_boosting':
+        # 2×2×2 = 8
         param_grid = {
-            'n_estimators': [50, 100, 200],
-            'max_depth': [3, 5],
+            'n_estimators':  [50, 100],
+            'max_depth':     [3, 5],
             'learning_rate': [0.01, 0.05],
-            'subsample': [0.8, 1.0],
-            'min_samples_split': [2, 5],
-            'min_samples_leaf': [1, 2]
         }
         base_model = GradientBoostingRegressor(random_state=42)
-        
+
     elif model_type == 'xgboost' and XGBOOST_AVAILABLE:
-        # param_grid = {
-        #     'n_estimators': [50, 100, 200],
-        #     'max_depth': [3, 6, 9],
-        #     'learning_rate': [0.01, 0.1, 0.2],
-        #     'subsample': [0.8, 0.9, 1.0]
-        # }
+        # 2×3×2 = 12
         param_grid = {
-        'n_estimators': [50, 100],  
-        'max_depth': [3, 6, 9], 
-        'learning_rate': [0.01, 0.05],  
-        'colsample_bytree': [0.8],  
-        'min_child_weight': [3],  
-        'reg_alpha': [0],  
-        'reg_lambda': [1, 2]  
-    }
+            'n_estimators':  [50, 100],
+            'max_depth':     [3, 6, 9],
+            'learning_rate': [0.01, 0.05],
+        }
         base_model = xgb.XGBRegressor(random_state=42, n_jobs=-1)
         
     else:
@@ -738,7 +716,7 @@ def train_and_evaluate_model(model_type, X_train, X_test, y_train, y_test, featu
 def main():
     # ==================== 配置参数 ====================
     # 数据划分模式: 'time' 表示按时间顺序划分, 'random' 表示随机划分
-    SPLIT_MODE = 'random'  # 可选值: 'time' 或 'random'
+    SPLIT_MODE = 'time'  # 可选值: 'time' 或 'random'
     TEST_SIZE = 0.2      # 测试集比例
     RANDOM_STATE = 42    # 随机种子（仅在SPLIT_MODE='random'时使用）
     # ================================================
@@ -747,7 +725,7 @@ def main():
     result_dir = ensure_result_dir()
     
     # CSV文件路径
-    csv_file = "./data/raw/束流.csv"
+    csv_file = "./data/raw/beamdata.csv"
 
     
     print(f"{'='*60}")

@@ -288,103 +288,84 @@ def save_model_and_results(model, scaler, train_metrics, test_metrics, feature_c
         'metrics_path': metrics_path
     }
 
-def plot_results(y_train_true, y_train_pred, y_test_true, y_test_pred, 
-                model, result_dir, title="MLP回归拟合结果"):
+def plot_results(y_train_true, y_train_pred, y_test_true, y_test_pred,
+                 model, result_dir, title="MLP模型在测试集上的预测情况"):
     """
-    绘制拟合结果图
-    
-    Args:
-        y_train_true (numpy.ndarray): 训练集真实值
-        y_train_pred (numpy.ndarray): 训练集预测值
-        y_test_true (numpy.ndarray): 测试集真实值
-        y_test_pred (numpy.ndarray): 测试集预测值
-        model: 训练好的模型
-        result_dir (str): 结果保存目录
-        title (str): 图表标题
+    三图布局：
+      (a) 顶部全宽 — 测试集时序：True Values（蓝实线）vs Predicted Values（红虚线）
+      (b) 左下     — 散点图：True Values vs Predicted Values + Perfect Fit + R²
+      (c) 右下     — 残差直方图 + KDE + STD 标注
     """
+    from matplotlib.gridspec import GridSpec
+    from scipy.stats import gaussian_kde
+    from sklearn.metrics import r2_score
+
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    
-    # 创建子图
-    fig = plt.figure(figsize=(20, 12))
-    
-    # 1. 训练集和测试集拟合结果对比
-    ax1 = plt.subplot(2, 3, 1)
-    ax1.scatter(y_train_true, y_train_pred, alpha=0.6, s=20, color='blue', label='训练集')
-    min_val = min(y_train_true.min(), y_train_pred.min())
-    max_val = max(y_train_true.max(), y_train_pred.max())
-    ax1.plot([min_val, max_val], [min_val, max_val], 'r--', lw=2, label='完美预测线')
-    ax1.set_xlabel('真实值')
-    ax1.set_ylabel('预测值')
-    ax1.set_title('训练集拟合结果')
-    ax1.legend()
-    ax1.grid(True, alpha=0.3)
-    
-    ax2 = plt.subplot(2, 3, 2)
-    ax2.scatter(y_test_true, y_test_pred, alpha=0.6, s=20, color='green', label='测试集')
-    min_val = min(y_test_true.min(), y_test_pred.min())
-    max_val = max(y_test_true.max(), y_test_pred.max())
-    ax2.plot([min_val, max_val], [min_val, max_val], 'r--', lw=2, label='完美预测线')
-    ax2.set_xlabel('真实值')
-    ax2.set_ylabel('预测值')
-    ax2.set_title('测试集拟合结果')
-    ax2.legend()
-    ax2.grid(True, alpha=0.3)
-    
-    # 2. 残差图
-    ax3 = plt.subplot(2, 3, 3)
-    train_residuals = y_train_true - y_train_pred
-    test_residuals = y_test_true - y_test_pred
-    ax3.scatter(y_train_pred, train_residuals, alpha=0.6, s=20, color='blue', label='训练集残差')
-    ax3.scatter(y_test_pred, test_residuals, alpha=0.6, s=20, color='green', label='测试集残差')
-    ax3.axhline(y=0, color='r', linestyle='--')
-    ax3.set_xlabel('预测值')
-    ax3.set_ylabel('残差')
-    ax3.set_title('残差图')
-    ax3.legend()
-    ax3.grid(True, alpha=0.3)
-    
-    # 3. 训练损失曲线（如果有的话）
-    ax4 = plt.subplot(2, 3, 4)
-    if hasattr(model, 'loss_curve_') and model.loss_curve_ is not None:
-        ax4.plot(model.loss_curve_, 'b-', linewidth=2)
-        ax4.set_xlabel('迭代次数')
-        ax4.set_ylabel('损失值')
-        ax4.set_title('训练损失曲线')
-        ax4.grid(True, alpha=0.3)
-    else:
-        ax4.text(0.5, 0.5, '无损失曲线数据', ha='center', va='center')
-        ax4.set_title('训练损失曲线')
-    
-    # 4. 预测值分布
-    ax5 = plt.subplot(2, 3, 5)
-    ax5.hist(y_train_true, bins=30, alpha=0.7, label='训练集真实值', color='blue')
-    ax5.hist(y_train_pred, bins=30, alpha=0.7, label='训练集预测值', color='red')
-    ax5.set_xlabel('值')
-    ax5.set_ylabel('频次')
-    ax5.set_title('训练集值分布')
-    ax5.legend()
-    ax5.grid(True, alpha=0.3)
-    
-    # 5. 测试集预测值分布
-    ax6 = plt.subplot(2, 3, 6)
-    ax6.hist(y_test_true, bins=30, alpha=0.7, label='测试集真实值', color='green')
-    ax6.hist(y_test_pred, bins=30, alpha=0.7, label='测试集预测值', color='orange')
-    ax6.set_xlabel('值')
-    ax6.set_ylabel('频次')
-    ax6.set_title('测试集值分布')
-    ax6.legend()
-    ax6.grid(True, alpha=0.3)
-    
-    plt.suptitle(title, fontsize=16)
-    plt.tight_layout()
-    
-    # 保存图片
+
+    fig = plt.figure(figsize=(14, 10))
+    gs  = GridSpec(2, 2, figure=fig, height_ratios=[1, 1.1],
+                   hspace=0.42, wspace=0.32)
+
+    x_idx = np.arange(len(y_test_true))
+
+    # ── (a) 时序图 ────────────────────────────────────────────
+    ax_a = fig.add_subplot(gs[0, :])
+    ax_a.plot(x_idx, y_test_true,
+              color='#2563eb', linewidth=1.2, alpha=0.85,
+              label='True Values')
+    ax_a.plot(x_idx, y_test_pred,
+              color='#dc2626', linewidth=1.2, linestyle='--', alpha=0.85,
+              label='Predicted Values')
+    ax_a.set_xlabel('Sample Number', fontsize=11)
+    ax_a.set_ylabel('束流 (target)', fontsize=11)
+    ax_a.legend(loc='upper right', fontsize=10)
+    ax_a.grid(True, alpha=0.25)
+    ax_a.annotate('(a)', xy=(0.01, 0.94), xycoords='axes fraction', fontsize=11)
+
+    # ── (b) 散点图 ────────────────────────────────────────────
+    ax_b = fig.add_subplot(gs[1, 0])
+    ax_b.scatter(y_test_true, y_test_pred,
+                 color='#2563eb', alpha=0.55, s=18, zorder=3)
+    v_min = min(y_test_true.min(), y_test_pred.min())
+    v_max = max(y_test_true.max(), y_test_pred.max())
+    ax_b.plot([v_min, v_max], [v_min, v_max],
+              color='#dc2626', linestyle='--', linewidth=1.8, label='Perfect Fit')
+    r2 = r2_score(y_test_true, y_test_pred)
+    ax_b.text(0.55, 0.12, f'$R^2 = {r2:.4f}$',
+              transform=ax_b.transAxes, fontsize=12,
+              bbox=dict(boxstyle='round,pad=0.3', fc='white', ec='gray', alpha=0.8))
+    ax_b.set_xlabel('True Values', fontsize=11)
+    ax_b.set_ylabel('Predicted Values', fontsize=11)
+    ax_b.legend(fontsize=10, loc='upper left')
+    ax_b.grid(True, alpha=0.25)
+    ax_b.annotate('(b)', xy=(0.01, 0.94), xycoords='axes fraction', fontsize=11)
+
+    # ── (c) 残差直方图 + KDE ──────────────────────────────────
+    ax_c = fig.add_subplot(gs[1, 1])
+    residuals = y_test_true - y_test_pred
+    std_val   = residuals.std()
+    bins_r    = np.histogram_bin_edges(residuals, bins=35)
+    ax_c.hist(residuals, bins=bins_r, density=True,
+              color='#93c5fd', edgecolor='white', linewidth=0.4, alpha=0.85)
+    kde   = gaussian_kde(residuals, bw_method='scott')
+    x_kde = np.linspace(residuals.min(), residuals.max(), 400)
+    ax_c.plot(x_kde, kde(x_kde),
+              color='#dc2626', linewidth=2.0)
+    ax_c.text(0.97, 0.93, f'STD = {std_val:.4f}',
+              transform=ax_c.transAxes, fontsize=11, ha='right',
+              bbox=dict(boxstyle='round,pad=0.3', fc='white', ec='gray', alpha=0.8))
+    ax_c.set_xlabel('Residue (target)', fontsize=11)
+    ax_c.set_ylabel('Frequency', fontsize=11)
+    ax_c.grid(True, alpha=0.25)
+    ax_c.annotate('(c)', xy=(0.01, 0.94), xycoords='axes fraction', fontsize=11)
+
+    plt.suptitle(title, fontsize=13, y=1.01)
+
     plot_path = os.path.join(result_dir, f"mlp_analysis_{timestamp}.png")
     plt.savefig(plot_path, dpi=300, bbox_inches='tight')
     print(f"分析图已保存为: {plot_path}")
-    
+
     plt.show()
-    
     return plot_path
 
 def main():
@@ -399,7 +380,7 @@ def main():
     result_dir = ensure_result_dir()
     
     # CSV文件路径
-    csv_file = "./data/raw/束流.csv"
+    csv_file = "./data/raw/beamdata.csv"
     
     print(f"{'='*60}")
     print(f"数据划分模式: {SPLIT_MODE}")
@@ -418,18 +399,7 @@ def main():
             X, y, test_size=TEST_SIZE, random_state=RANDOM_STATE, split_mode=SPLIT_MODE
         )
         
-        # 对特征进行标准化
-        print("对特征进行标准化...")
-        scaler = StandardScaler()
-        X_train = scaler.fit_transform(X_train)
-        X_test = scaler.transform(X_test)
-        
-        print(f"标准化完成 - 均值: {scaler.mean_[:5]}... (显示前5个)")
-        print(f"标准化完成 - 标准差: {scaler.scale_[:5]}... (显示前5个)")
- 
-        
-
-        # 训练MLP回归模型
+        # 训练MLP回归模型（标准化在 train_mlp 内部完成）
         model, scaler = train_mlp(
             X_train, y_train, 
             hidden_layer_sizes=(100, 50),  # 两个隐藏层：100和50个神经元

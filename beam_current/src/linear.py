@@ -251,111 +251,151 @@ def save_model_and_results(model, train_metrics, test_metrics, feature_columns,
         'metrics_path': metrics_path
     }
 
-def plot_results(y_train_true, y_train_pred, y_test_true, y_test_pred, 
-                feature_columns, model, result_dir, title="线性回归拟合结果"):
+def plot_timeseries(y_train_true, y_train_pred, y_test_true, y_test_pred,
+                    result_dir, title="线性回归 — 全局时序预测对比"):
     """
-    绘制拟合结果图
-    
+    绘制完整时序曲线图（单张独立大图）
+
+    4 条线：
+      蓝色实线   — 全部真实值（训练+测试连续）
+      绿色虚线   — 训练集预测值（前 80%）
+      红色虚线   — 测试集预测值（后 20%）
+      灰色点线   — 训练/测试分界线
+
     Args:
-        y_train_true (numpy.ndarray): 训练集真实值
-        y_train_pred (numpy.ndarray): 训练集预测值
-        y_test_true (numpy.ndarray): 测试集真实值
-        y_test_pred (numpy.ndarray): 测试集预测值
-        feature_columns (list): 特征列名
-        model: 训练好的模型
-        result_dir (str): 结果保存目录
-        title (str): 图表标题
+        y_train_true  (numpy.ndarray): 训练集真实值
+        y_train_pred  (numpy.ndarray): 训练集预测值
+        y_test_true   (numpy.ndarray): 测试集真实值
+        y_test_pred   (numpy.ndarray): 测试集预测值
+        result_dir    (str): 结果保存目录
+        title         (str): 图表标题
     """
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    
-    # 创建子图
-    fig = plt.figure(figsize=(20, 12))
-    
-    # 1. 训练集和测试集拟合结果对比
-    ax1 = plt.subplot(2, 3, 1)
-    ax1.scatter(y_train_true, y_train_pred, alpha=0.6, s=20, color='blue', label='训练集')
-    min_val = min(y_train_true.min(), y_train_pred.min())
-    max_val = max(y_train_true.max(), y_train_pred.max())
-    ax1.plot([min_val, max_val], [min_val, max_val], 'r--', lw=2, label='完美预测线')
-    ax1.set_xlabel('真实值')
-    ax1.set_ylabel('预测值')
-    ax1.set_title('训练集拟合结果')
-    ax1.legend()
-    ax1.grid(True, alpha=0.3)
-    
-    ax2 = plt.subplot(2, 3, 2)
-    ax2.scatter(y_test_true, y_test_pred, alpha=0.6, s=20, color='green', label='测试集')
-    min_val = min(y_test_true.min(), y_test_pred.min())
-    max_val = max(y_test_true.max(), y_test_pred.max())
-    ax2.plot([min_val, max_val], [min_val, max_val], 'r--', lw=2, label='完美预测线')
-    ax2.set_xlabel('真实值')
-    ax2.set_ylabel('预测值')
-    ax2.set_title('测试集拟合结果')
-    ax2.legend()
-    ax2.grid(True, alpha=0.3)
-    
-    # 2. 残差图
-    ax3 = plt.subplot(2, 3, 3)
-    train_residuals = y_train_true - y_train_pred
-    test_residuals = y_test_true - y_test_pred
-    ax3.scatter(y_train_pred, train_residuals, alpha=0.6, s=20, color='blue', label='训练集残差')
-    ax3.scatter(y_test_pred, test_residuals, alpha=0.6, s=20, color='green', label='测试集残差')
-    ax3.axhline(y=0, color='r', linestyle='--')
-    ax3.set_xlabel('预测值')
-    ax3.set_ylabel('残差')
-    ax3.set_title('残差图')
-    ax3.legend()
-    ax3.grid(True, alpha=0.3)
-    
-    # 3. 特征重要性
-    ax4 = plt.subplot(2, 3, 4)
-    feature_importance = np.abs(model.coef_)
-    top_features = min(10, len(feature_columns))
-    top_indices = np.argsort(feature_importance)[-top_features:]
-    
-    ax4.barh(range(top_features), feature_importance[top_indices])
-    ax4.set_yticks(range(top_features))
-    ax4.set_yticklabels([feature_columns[i] for i in top_indices])
-    ax4.set_xlabel('特征重要性（系数绝对值）')
-    ax4.set_title(f'前{top_features}个重要特征')
-    ax4.grid(True, alpha=0.3)
-    
-    # 4. 预测值分布
-    ax5 = plt.subplot(2, 3, 5)
-    ax5.hist(y_train_true, bins=30, alpha=0.7, label='训练集真实值', color='blue')
-    ax5.hist(y_train_pred, bins=30, alpha=0.7, label='训练集预测值', color='red')
-    ax5.set_xlabel('值')
-    ax5.set_ylabel('频次')
-    ax5.set_title('训练集值分布')
-    ax5.legend()
-    ax5.grid(True, alpha=0.3)
-    
-    # 5. 测试集预测值分布
-    ax6 = plt.subplot(2, 3, 6)
-    ax6.hist(y_test_true, bins=30, alpha=0.7, label='测试集真实值', color='green')
-    ax6.hist(y_test_pred, bins=30, alpha=0.7, label='测试集预测值', color='orange')
-    ax6.set_xlabel('值')
-    ax6.set_ylabel('频次')
-    ax6.set_title('测试集值分布')
-    ax6.legend()
-    ax6.grid(True, alpha=0.3)
-    
-    plt.suptitle(title, fontsize=16)
-    plt.tight_layout()
-    
-    # 保存图片
+
+    n_train = len(y_train_true)
+    n_total = n_train + len(y_test_true)
+    x_idx   = np.arange(n_total)
+
+    all_true       = np.concatenate([y_train_true, y_test_true])
+    train_pred_full = np.full(n_total, np.nan)
+    test_pred_full  = np.full(n_total, np.nan)
+    train_pred_full[:n_train] = y_train_pred
+    test_pred_full[n_train:]  = y_test_pred
+
+    fig, ax = plt.subplots(figsize=(16, 5))
+
+    ax.plot(x_idx, all_true,
+            color='#2563eb', linewidth=0.9, alpha=0.9,
+            label='真实值（全部）')
+    ax.plot(x_idx, train_pred_full,
+            color='#16a34a', linewidth=0.9, linestyle='--', alpha=0.9,
+            label='训练集预测值')
+    ax.plot(x_idx, test_pred_full,
+            color='#dc2626', linewidth=0.9, linestyle='--', alpha=0.9,
+            label='测试集预测值')
+    ax.axvline(x=n_train,
+               color='gray', linewidth=1.4, linestyle=':',
+               label=f'训练/测试分界 (n={n_train})')
+
+    ax.set_xlabel('样本索引', fontsize=12)
+    ax.set_ylabel('束流 (target)', fontsize=12)
+    ax.set_title(title, fontsize=14)
+    ax.legend(loc='upper right', fontsize=10)
+    ax.grid(True, alpha=0.3)
+    fig.tight_layout()
+
+    plot_path = os.path.join(result_dir, f"linear_timeseries_{timestamp}.png")
+    fig.savefig(plot_path, dpi=300, bbox_inches='tight')
+    print(f"时序曲线图已保存为: {plot_path}")
+
+    plt.show()
+    return plot_path
+
+
+def plot_results(y_train_true, y_train_pred, y_test_true, y_test_pred,
+                 feature_columns, model, result_dir, title="线性回归模型在测试集上的预测情况"):
+    """
+    三图布局（仿图2.9风格）：
+      (a) 顶部全宽 — 测试集时序：真实值（蓝圆点）vs 预测值（红虚线星号）
+      (b) 左下     — 散点图：True Values vs Predicted Values + Perfect Fit + R²
+      (c) 右下     — 残差直方图 + KDE + STD 标注
+    """
+    from matplotlib.gridspec import GridSpec
+    from scipy.stats import gaussian_kde
+    from sklearn.metrics import r2_score
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+    fig = plt.figure(figsize=(14, 10))
+    gs  = GridSpec(2, 2, figure=fig, height_ratios=[1, 1.1],
+                   hspace=0.42, wspace=0.32)
+
+    x_idx = np.arange(len(y_test_true))
+
+    # ── (a) 时序图 ────────────────────────────────────────────
+    ax_a = fig.add_subplot(gs[0, :])
+    ax_a.plot(x_idx, y_test_true,
+              color='#2563eb', linewidth=1.2, alpha=0.85,
+              label='True Values')
+    ax_a.plot(x_idx, y_test_pred,
+              color='#dc2626', linewidth=1.2, linestyle='--', alpha=0.85,
+              label='Predicted Values')
+    ax_a.set_xlabel('Sample Number', fontsize=11)
+    ax_a.set_ylabel('束流 (target)', fontsize=11)
+    ax_a.legend(loc='upper right', fontsize=10)
+    ax_a.grid(True, alpha=0.25)
+    ax_a.annotate('(a)', xy=(0.01, 0.94), xycoords='axes fraction', fontsize=11)
+
+    # ── (b) 散点图 ────────────────────────────────────────────
+    ax_b = fig.add_subplot(gs[1, 0])
+    ax_b.scatter(y_test_true, y_test_pred,
+                 color='#2563eb', alpha=0.55, s=18, zorder=3)
+    v_min = min(y_test_true.min(), y_test_pred.min())
+    v_max = max(y_test_true.max(), y_test_pred.max())
+    ax_b.plot([v_min, v_max], [v_min, v_max],
+              color='#dc2626', linestyle='--', linewidth=1.8, label='Perfect Fit')
+    r2 = r2_score(y_test_true, y_test_pred)
+    ax_b.text(0.55, 0.12, f'$R^2 = {r2:.4f}$',
+              transform=ax_b.transAxes, fontsize=12,
+              bbox=dict(boxstyle='round,pad=0.3', fc='white', ec='gray', alpha=0.8))
+    ax_b.set_xlabel('True Values', fontsize=11)
+    ax_b.set_ylabel('Predicted Values', fontsize=11)
+    ax_b.legend(fontsize=10, loc='upper left')
+    ax_b.grid(True, alpha=0.25)
+    ax_b.annotate('(b)', xy=(0.01, 0.94), xycoords='axes fraction', fontsize=11)
+
+    # ── (c) 残差直方图 + KDE ──────────────────────────────────
+    ax_c = fig.add_subplot(gs[1, 1])
+    residuals = y_test_true - y_test_pred
+    std_val   = residuals.std()
+    bins_r    = np.histogram_bin_edges(residuals, bins=35)
+    ax_c.hist(residuals, bins=bins_r, density=True,
+              color='#93c5fd', edgecolor='white', linewidth=0.4, alpha=0.85)
+    kde   = gaussian_kde(residuals, bw_method='scott')
+    x_kde = np.linspace(residuals.min(), residuals.max(), 400)
+    ax_c.plot(x_kde, kde(x_kde),
+              color='#dc2626', linewidth=2.0)
+    ax_c.text(0.97, 0.93, f'STD = {std_val:.4f}',
+              transform=ax_c.transAxes, fontsize=11, ha='right',
+              bbox=dict(boxstyle='round,pad=0.3', fc='white', ec='gray', alpha=0.8))
+    ax_c.set_xlabel('Residue (target)', fontsize=11)
+    ax_c.set_ylabel('Frequency', fontsize=11)
+    ax_c.grid(True, alpha=0.25)
+    ax_c.annotate('(c)', xy=(0.01, 0.94), xycoords='axes fraction', fontsize=11)
+
+    plt.suptitle(title, fontsize=13, y=1.01)
+
     plot_path = os.path.join(result_dir, f"linear_regression_analysis_{timestamp}.png")
     plt.savefig(plot_path, dpi=300, bbox_inches='tight')
     print(f"分析图已保存为: {plot_path}")
-    
+
     plt.show()
-    
     return plot_path
 
 def main():
     # ==================== 配置参数 ====================
     # 数据划分模式: 'time' 表示按时间顺序划分, 'random' 表示随机划分
-    SPLIT_MODE = 'random'  # 可选值: 'time' 或 'random'
+    SPLIT_MODE = 'time'  # 可选值: 'time' 或 'random'
     TEST_SIZE = 0.2      # 测试集比例
     RANDOM_STATE = 42    # 随机种子（仅在SPLIT_MODE='random'时使用）
     # ================================================
@@ -364,7 +404,7 @@ def main():
     result_dir = ensure_result_dir()
     
     # CSV文件路径
-    csv_file = "./data/raw/束流.csv"
+    csv_file = "data/raw/beamdata.csv"
 
     
     print(f"{'='*60}")
@@ -419,7 +459,7 @@ def main():
             split_mode=SPLIT_MODE, test_size=TEST_SIZE, random_state=RANDOM_STATE
         )
         
-        # 绘制结果图
+        # 绘制综合分析图
         plot_path = plot_results(
             y_train, y_train_pred, y_test, y_test_pred,
             feature_columns, model, result_dir
