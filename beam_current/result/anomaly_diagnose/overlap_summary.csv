@@ -1,0 +1,10 @@
+﻿topK,methods,pair_type,overlap_count,overlap_rate,overlap_features
+3,SHAP(RF) ∩ PLS ∩ StatDiff ∩ AE,all4,1,0.3333333333333333,feature4
+5,SHAP(RF) ∩ PLS ∩ StatDiff ∩ AE,all4,2,0.4,"feature10, feature4"
+10,SHAP(RF) ∩ PLS ∩ StatDiff ∩ AE,all4,4,0.4,"feature10, feature4, feature6, feature7"
+10,SHAP(RF) ∩ PLS,pair,8,0.8,"feature10, feature11, feature13, feature19, feature21, feature4, feature6, feature7"
+10,SHAP(RF) ∩ StatDiff,pair,8,0.8,"feature10, feature11, feature19, feature2, feature21, feature4, feature6, feature7"
+10,SHAP(RF) ∩ AE,pair,6,0.6,"feature10, feature2, feature3, feature4, feature6, feature7"
+10,PLS ∩ StatDiff,pair,8,0.8,"feature10, feature11, feature19, feature21, feature4, feature5, feature6, feature7"
+10,PLS ∩ AE,pair,4,0.4,"feature10, feature4, feature6, feature7"
+10,StatDiff ∩ AE,pair,5,0.5,"feature10, feature2, feature4, feature6, feature7"
