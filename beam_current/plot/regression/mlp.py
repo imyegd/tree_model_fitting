@@ -43,16 +43,6 @@ def find_latest_model(result_root: str = "result/mlp") -> str:
     return candidates[-1]
 
 
-def find_paired_scaler(model_path: str) -> str:
-    """根据模型路径找到同目录下对应的 mlp_scaler_*.pkl"""
-    model_dir = os.path.dirname(model_path)
-    candidates = sorted(glob.glob(os.path.join(model_dir, "mlp_scaler_*.pkl")))
-    if not candidates:
-        raise FileNotFoundError(
-            f"在 {model_dir} 下未找到配套的 mlp_scaler_*.pkl。"
-        )
-    return candidates[-1]
-
 
 def load_data(csv_path: str):
     print(f"读取数据: {csv_path}")
@@ -153,22 +143,17 @@ def main():
     parser = argparse.ArgumentParser(description="加载 MLP 模型并绘图（无需重新训练）")
     parser.add_argument("--model", type=str, default=None,
                         help="指定模型 .pkl 路径；不指定则自动使用最新模型")
-    parser.add_argument("--scaler", type=str, default=None,
-                        help="指定 scaler .pkl 路径；不指定则自动在模型同目录下查找")
     parser.add_argument("--data", type=str, default=CSV_FILE,
                         help=f"CSV 数据路径（默认 {CSV_FILE}）")
     parser.add_argument("--test-size", type=float, default=TEST_SIZE,
                         help=f"测试集比例（默认 {TEST_SIZE}，须与训练时一致）")
     args = parser.parse_args()
 
-    # 1. 定位模型与 scaler
-    model_path  = args.model  or find_latest_model()
-    scaler_path = args.scaler or find_paired_scaler(model_path)
-    print(f"使用模型:  {model_path}")
-    print(f"使用scaler: {scaler_path}")
+    # 1. 定位模型
+    model_path = args.model or find_latest_model()
+    print(f"使用模型: {model_path}")
 
-    model  = joblib.load(model_path)
-    scaler = joblib.load(scaler_path)   # train_mlp 内部保存的 scaler
+    model = joblib.load(model_path)
 
     save_dir = os.path.dirname(model_path)
 
@@ -176,13 +161,9 @@ def main():
     X, y, _ = load_data(args.data)
     X_train, X_test, y_train, y_test = split_time(X, y, test_size=args.test_size)
 
-    # 3. 用保存的 scaler 做标准化（train_mlp 内部唯一的标准化）
-    X_train_sc = scaler.transform(X_train)
-    X_test_sc  = scaler.transform(X_test)
-
-    # 4. 用已有模型预测（不重新训练）
-    y_train_pred = model.predict(X_train_sc)
-    y_test_pred  = model.predict(X_test_sc)
+    # 3. 用已有模型预测（不重新训练）
+    y_train_pred = model.predict(X_train)
+    y_test_pred  = model.predict(X_test)
 
     print(f"训练集: {len(y_train)} 样本  测试集: {len(y_test)} 样本")
     print(f"测试集 R²: {r2_score(y_test, y_test_pred):.4f}")

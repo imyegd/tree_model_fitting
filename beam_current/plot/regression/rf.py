@@ -14,7 +14,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 import joblib
 from datetime import datetime
-from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import train_test_split
 from sklearn.metrics import r2_score
 from matplotlib.gridspec import GridSpec
 from scipy.stats import gaussian_kde
@@ -22,8 +22,8 @@ from scipy.stats import gaussian_kde
 matplotlib.rcParams['font.sans-serif'] = ['Microsoft YaHei']
 matplotlib.rcParams['axes.unicode_minus'] = False
 
-MODEL_PATH = "models/RF_regressor.pkl"
-CSV_FILE   = "data/raw/beamdata.csv"
+MODEL_PATH = "result/tree_model/20260309_153154/random_forest_model_20260309_153555.pkl"
+CSV_FILE   = "data/raw/束流.csv"
 TEST_SIZE  = 0.2
 SAVE_DIR   = "result/tree_model"
 
@@ -119,16 +119,16 @@ if __name__ == "__main__":
     model = joblib.load(MODEL_PATH)
 
     X, y, _ = load_data(CSV_FILE)
-    X_train, X_test, y_train, y_test = split_time(X, y, TEST_SIZE)
 
-    scaler = StandardScaler()
-    X_train_sc = scaler.fit_transform(X_train)
-    X_test_sc  = scaler.transform(X_test)
+    # 训练集：随机划分（与训练时一致）
+    X_train, _, y_train, _ = train_test_split(X, y, test_size=TEST_SIZE, random_state=42)
+    y_train_pred = model.predict(X_train)
 
-    y_train_pred = model.predict(X_train_sc)
-    y_test_pred  = model.predict(X_test_sc)
+    # 测试集：时序后 20%
+    _, X_test_time, _, y_test = split_time(X, y, TEST_SIZE)
+    y_test_pred = model.predict(X_test_time)
 
-    print(f"训练集: {len(y_train)} 样本  测试集: {len(y_test)} 样本")
+    print(f"训练集: {len(y_train)} 样本  测试集（时序后20%）: {len(y_test)} 样本")
     print(f"测试集 R²: {r2_score(y_test, y_test_pred):.4f}")
 
     plot_results(y_train, y_train_pred, y_test, y_test_pred, SAVE_DIR)

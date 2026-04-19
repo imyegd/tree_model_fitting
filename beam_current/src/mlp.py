@@ -133,13 +133,9 @@ def train_mlp(X_train, y_train, hidden_layer_sizes=(100,), max_iter=500, learnin
         learning_rate_init (float): 初始学习率
     
     Returns:
-        tuple: (MLPRegressor, StandardScaler) 训练好的模型和标准化器
+        MLPRegressor: 训练好的模型
     """
     print("开始训练MLP模型...")
-    
-    # 标准化特征（MLP对输入数据的尺度敏感）
-    scaler = StandardScaler()
-    X_train_scaled = scaler.fit_transform(X_train)
     
     # 创建MLP回归模型
     model = MLPRegressor(
@@ -157,21 +153,20 @@ def train_mlp(X_train, y_train, hidden_layer_sizes=(100,), max_iter=500, learnin
     )
     
     # 训练模型
-    model.fit(X_train_scaled, y_train)
+    model.fit(X_train, y_train)
     
     print("MLP模型训练完成")
     print(f"迭代次数: {model.n_iter_}")
     print(f"损失值: {model.loss_:.6f}")
     
-    return model, scaler
+    return model
 
-def evaluate_model(model, scaler, X, y, dataset_name="数据集"):
+def evaluate_model(model, X, y, dataset_name="数据集"):
     """
     评估模型性能
     
     Args:
         model: 训练好的模型
-        scaler: 标准化器
         X (numpy.ndarray): 特征矩阵
         y (numpy.ndarray): 真实目标变量
         dataset_name (str): 数据集名称
@@ -179,11 +174,8 @@ def evaluate_model(model, scaler, X, y, dataset_name="数据集"):
     Returns:
         tuple: (metrics_dict, y_pred)
     """
-    # 标准化特征
-    X_scaled = scaler.transform(X)
-    
     # 预测
-    y_pred = model.predict(X_scaled)
+    y_pred = model.predict(X)
     
     # 计算评估指标
     mse = mean_squared_error(y, y_pred)
@@ -204,7 +196,7 @@ def evaluate_model(model, scaler, X, y, dataset_name="数据集"):
     
     return metrics, y_pred
 
-def save_model_and_results(model, scaler, train_metrics, test_metrics, feature_columns, 
+def save_model_and_results(model, train_metrics, test_metrics, feature_columns,
                           y_train, y_train_pred, y_test, y_test_pred, result_dir,
                           split_mode='time', test_size=0.2, random_state=None):
     """
@@ -212,7 +204,6 @@ def save_model_and_results(model, scaler, train_metrics, test_metrics, feature_c
     
     Args:
         model: 训练好的模型
-        scaler: 标准化器
         train_metrics (dict): 训练集评估指标
         test_metrics (dict): 测试集评估指标
         feature_columns (list): 特征列名
@@ -225,14 +216,10 @@ def save_model_and_results(model, scaler, train_metrics, test_metrics, feature_c
     """
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     
-    # 1. 保存模型和标准化器
+    # 1. 保存模型
     model_path = os.path.join(result_dir, f"mlp_model_{timestamp}.pkl")
-    scaler_path = os.path.join(result_dir, f"mlp_scaler_{timestamp}.pkl")
-    
     joblib.dump(model, model_path)
-    joblib.dump(scaler, scaler_path)
     print(f"模型已保存到: {model_path}")
-    print(f"标准化器已保存到: {scaler_path}")
     
     # 2. 保存模型信息
     model_info = {
@@ -283,7 +270,6 @@ def save_model_and_results(model, scaler, train_metrics, test_metrics, feature_c
     
     return {
         'model_path': model_path,
-        'scaler_path': scaler_path,
         'info_path': info_path,
         'metrics_path': metrics_path
     }
@@ -399,8 +385,8 @@ def main():
             X, y, test_size=TEST_SIZE, random_state=RANDOM_STATE, split_mode=SPLIT_MODE
         )
         
-        # 训练MLP回归模型（标准化在 train_mlp 内部完成）
-        model, scaler = train_mlp(
+        # 训练MLP回归模型
+        model = train_mlp(
             X_train, y_train, 
             hidden_layer_sizes=(100, 50),  # 两个隐藏层：100和50个神经元
             max_iter=1000,
@@ -408,14 +394,14 @@ def main():
         )
         
         # 评估训练集性能
-        train_metrics, y_train_pred = evaluate_model(model, scaler, X_train, y_train, "训练集")
+        train_metrics, y_train_pred = evaluate_model(model, X_train, y_train, "训练集")
         
         # 评估测试集性能
-        test_metrics, y_test_pred = evaluate_model(model, scaler, X_test, y_test, "测试集")
+        test_metrics, y_test_pred = evaluate_model(model, X_test, y_test, "测试集")
         
         # 保存模型和结果
         saved_paths = save_model_and_results(
-            model, scaler, train_metrics, test_metrics, feature_columns,
+            model, train_metrics, test_metrics, feature_columns,
             y_train, y_train_pred, y_test, y_test_pred, result_dir,
             split_mode=SPLIT_MODE, test_size=TEST_SIZE, random_state=RANDOM_STATE
         )

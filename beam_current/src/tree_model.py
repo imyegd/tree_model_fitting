@@ -716,7 +716,7 @@ def train_and_evaluate_model(model_type, X_train, X_test, y_train, y_test, featu
 def main():
     # ==================== 配置参数 ====================
     # 数据划分模式: 'time' 表示按时间顺序划分, 'random' 表示随机划分
-    SPLIT_MODE = 'time'  # 可选值: 'time' 或 'random'
+    SPLIT_MODE = 'random'  # 可选值: 'time' 或 'random'
     TEST_SIZE = 0.2      # 测试集比例
     RANDOM_STATE = 42    # 随机种子（仅在SPLIT_MODE='random'时使用）
     # ================================================
@@ -746,15 +746,6 @@ def main():
             X, y, test_size=TEST_SIZE, random_state=RANDOM_STATE, split_mode=SPLIT_MODE
         )
         
-        # 对特征进行标准化
-        print("对特征进行标准化...")
-        scaler = StandardScaler()
-        X_train = scaler.fit_transform(X_train)
-        X_test = scaler.transform(X_test)
-        
-        print(f"标准化完成 - 均值: {scaler.mean_[:5]}... (显示前5个)")
-        print(f"标准化完成 - 标准差: {scaler.scale_[:5]}... (显示前5个)")
-            
 
 
             
